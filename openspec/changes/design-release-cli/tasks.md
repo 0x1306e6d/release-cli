@@ -1,8 +1,8 @@
 ## 1. Project Scaffolding
 
-- [ ] 1.1 Initialize Go module (`go mod init`), add cobra dependency, create `cmd/release-cli/main.go` entry point
-- [ ] 1.2 Set up project directory structure (`internal/cli`, `internal/config`, `internal/detector`, `internal/version`, `internal/commits`, `internal/changelog`, `internal/propagate`, `internal/pipeline`, `internal/publish`, `internal/notify`, `internal/git`)
-- [ ] 1.3 Implement root cobra command with `--version` flag and global flags (`--dry-run`, `--verbose`)
+- [x] 1.1 Initialize Go module (`go mod init`), add cobra dependency, create `cmd/release-cli/main.go` entry point
+- [x] 1.2 Set up project directory structure (`internal/cli`, `internal/config`, `internal/detector`, `internal/version`, `internal/commits`, `internal/changelog`, `internal/propagate`, `internal/pipeline`, `internal/publish`, `internal/notify`, `internal/git`)
+- [x] 1.3 Implement root cobra command with `--version` flag and global flags (`--dry-run`, `--verbose`)
 
 ## 2. Configuration
 
