@@ -1,3 +1,9 @@
+## 0.0.2 (2026-03-18)
+
+### Other
+
+- Wire GitHub Release publishing into release pipeline
+
 # Changelog
 
 ## 0.0.1 (2026-03-18)
