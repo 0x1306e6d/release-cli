@@ -16,6 +16,12 @@ func initTestRepo(t *testing.T) string {
 	mustGit(t, dir, "init")
 	mustGit(t, dir, "config", "user.email", "test@test.com")
 	mustGit(t, dir, "config", "user.name", "Test")
+
+	// Create a bare remote so push works in tests.
+	bare := t.TempDir()
+	mustGit(t, bare, "init", "--bare")
+	mustGit(t, dir, "remote", "add", "origin", bare)
+
 	return dir
 }
 

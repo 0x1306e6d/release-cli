@@ -136,6 +136,12 @@ func Run(opts Options) (*Result, error) {
 	}
 	report("✓ Tagged %s", tag)
 
+	// 11b. Push commit and tag to remote.
+	if err := git.Push(dir, tag); err != nil {
+		return nil, fmt.Errorf("pushing release: %w", err)
+	}
+	report("✓ Pushed commit and tag to remote")
+
 	// 12. Pre-publish hook.
 	if err := RunHook(dir, cfg.Hooks.PrePublish, newVer.String(), prevVer.CoreString(), cfg.Project); err != nil {
 		return nil, err
@@ -163,6 +169,9 @@ func Run(opts Options) (*Result, error) {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
 		report("✓ Bumped to next development version: %s", snapVer.String())
+		if err := git.Push(dir, ""); err != nil {
+			return nil, fmt.Errorf("pushing snapshot commit: %w", err)
+		}
 	}
 
 	return &Result{
