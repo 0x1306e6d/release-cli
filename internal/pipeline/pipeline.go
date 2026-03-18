@@ -172,6 +172,7 @@ func Run(opts Options) (*Result, error) {
 		if err := git.Push(dir, ""); err != nil {
 			return nil, fmt.Errorf("pushing snapshot commit: %w", err)
 		}
+		report("✓ Pushed snapshot commit to remote")
 	}
 
 	return &Result{
