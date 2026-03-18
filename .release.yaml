@@ -1,4 +1,6 @@
 project: go
+commits:
+  convention: freeform
 
 publish:
   github:

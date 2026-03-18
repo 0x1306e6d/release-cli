@@ -90,6 +90,8 @@ func resolveStatusConvention(cfg *config.Config) commits.Convention {
 	switch cfg.Commits.Convention {
 	case "angular":
 		return &commits.AngularCommits{}
+	case "freeform":
+		return &commits.FreeformCommits{}
 	case "custom":
 		return commits.NewCustomCommits(
 			cfg.Commits.Types.Major,

@@ -41,7 +41,7 @@ When multiple commits have different bump implications, the system SHALL use the
 - **THEN** the determined bump type is `minor` (higher than patch)
 
 ### Requirement: Configurable commit convention
-The system SHALL allow configuring the commit convention in `.release.yaml`. Supported values SHALL include `conventional` and `angular`. A `custom` option SHALL allow defining arbitrary type-to-bump mappings.
+The system SHALL allow configuring the commit convention in `.release.yaml`. Supported values SHALL include `conventional`, `angular`, `freeform`, and `custom`. A `custom` option SHALL allow defining arbitrary type-to-bump mappings.
 
 #### Scenario: Custom commit convention
 - **WHEN** the config specifies `commits.convention: custom` with `minor: ["feature", "enhancement"]`
@@ -52,6 +52,11 @@ The system SHALL allow configuring the commit convention in `.release.yaml`. Sup
 - **WHEN** the config specifies `commits.convention: angular`
 - **AND** commits follow Angular commit format
 - **THEN** the system parses them according to Angular conventions
+
+#### Scenario: Freeform convention
+- **WHEN** the config specifies `commits.convention: freeform`
+- **AND** commits use plain English messages
+- **THEN** every commit is treated as a releasable patch-level change
 
 ### Requirement: Non-conforming commits are ignored for bump calculation
 Commits that do not match the configured convention SHALL be ignored when determining the bump type but MAY be included in the changelog under an "Other" category.
