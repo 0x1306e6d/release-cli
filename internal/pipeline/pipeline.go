@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/0x1306e6d/release-cli/internal/changelog"
 	"github.com/0x1306e6d/release-cli/internal/commits"
@@ -9,6 +10,7 @@ import (
 	"github.com/0x1306e6d/release-cli/internal/detector"
 	"github.com/0x1306e6d/release-cli/internal/git"
 	"github.com/0x1306e6d/release-cli/internal/propagate"
+	"github.com/0x1306e6d/release-cli/internal/publish"
 	"github.com/0x1306e6d/release-cli/internal/version"
 )
 
@@ -147,8 +149,10 @@ func Run(opts Options) (*Result, error) {
 		return nil, err
 	}
 
-	// 13. Publish (placeholder — implemented in publish package).
-	// Publish integration will be wired here once implemented.
+	// 13. Publish.
+	if err := runGitHubPublish(dir, cfg, tag, newVer.String(), changelogContent); err != nil {
+		return nil, err
+	}
 
 	// 14. Post-publish hook.
 	if err := RunHook(dir, cfg.Hooks.PostPublish, newVer.String(), prevVer.CoreString(), cfg.Project); err != nil {
@@ -221,6 +225,9 @@ func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.
 		report("[dry-run] Would update %s", cfg.Changelog.File)
 	}
 	report("[dry-run] Would create tag %s", next.TagString())
+	if cfg.Publish.GitHub.Enabled == nil || *cfg.Publish.GitHub.Enabled {
+		report("[dry-run] Would publish GitHub Release")
+	}
 	if cfg.Version.Snapshot && det.SnapshotSuffix() != "" {
 		snapVer := version.NextSnapshot(next, version.NormalizeSnapshotSuffix(det.SnapshotSuffix()))
 		report("[dry-run] Would bump to %s after release", snapVer.String())
@@ -230,6 +237,45 @@ func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.
 		NewVersion:  next.String(),
 		TagName:     next.TagString(),
 	}
+}
+
+func runGitHubPublish(dir string, cfg *config.Config, tag, ver, changelogBody string) error {
+	if cfg.Publish.GitHub.Enabled != nil && !*cfg.Publish.GitHub.Enabled {
+		return nil
+	}
+
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		report("⚠ GITHUB_TOKEN not set, skipping GitHub Release")
+		return nil
+	}
+
+	owner, repo, err := git.RemoteOwnerRepo(dir)
+	if err != nil {
+		report("⚠ Cannot determine repository owner/name, skipping GitHub Release: %v", err)
+		return nil
+	}
+
+	pub := &publish.GitHubPublisher{
+		Token:     token,
+		Owner:     owner,
+		Repo:      repo,
+		Draft:     cfg.Publish.GitHub.Draft,
+		Artifacts: cfg.Publish.GitHub.Artifacts,
+		Dir:       dir,
+	}
+
+	if err := pub.Publish(publish.ReleaseInfo{
+		TagName:       tag,
+		Version:       ver,
+		ChangelogBody: changelogBody,
+		Project:       cfg.Project,
+	}); err != nil {
+		return fmt.Errorf("publishing GitHub release: %w", err)
+	}
+
+	report("✓ Published GitHub Release")
+	return nil
 }
 
 func report(format string, args ...any) {
