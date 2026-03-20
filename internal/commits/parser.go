@@ -47,3 +47,18 @@ type RawCommit struct {
 	Subject string
 	Body    string
 }
+
+// ResolveConvention returns the Convention implementation for the given
+// convention name and optional custom type-to-bump mappings.
+func ResolveConvention(convention string, major, minor, patch []string) Convention {
+	switch convention {
+	case "angular":
+		return &AngularCommits{}
+	case "freeform":
+		return &FreeformCommits{}
+	case "custom":
+		return NewCustomCommits(major, minor, patch)
+	default:
+		return &ConventionalCommits{}
+	}
+}

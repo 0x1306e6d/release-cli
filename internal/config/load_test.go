@@ -25,8 +25,8 @@ func TestLoad_MinimalConfig(t *testing.T) {
 	if cfg.Version.Scheme != "semver" {
 		t.Errorf("version.scheme = %q, want %q", cfg.Version.Scheme, "semver")
 	}
-	if cfg.Commits.Convention != "conventional" {
-		t.Errorf("commits.convention = %q, want %q", cfg.Commits.Convention, "conventional")
+	if cfg.Categorize.Convention != "conventional" {
+		t.Errorf("categorize.convention = %q, want %q", cfg.Categorize.Convention, "conventional")
 	}
 	if cfg.Changelog.Enabled == nil || !*cfg.Changelog.Enabled {
 		t.Error("changelog.enabled should default to true")
@@ -45,7 +45,7 @@ func TestLoad_FullConfig(t *testing.T) {
 version:
   scheme: semver
   snapshot: true
-commits:
+categorize:
   convention: angular
 changelog:
   enabled: false
@@ -75,8 +75,8 @@ publish:
 	if !cfg.Version.Snapshot {
 		t.Error("version.snapshot should be true")
 	}
-	if cfg.Commits.Convention != "angular" {
-		t.Errorf("commits.convention = %q, want %q", cfg.Commits.Convention, "angular")
+	if cfg.Categorize.Convention != "angular" {
+		t.Errorf("categorize.convention = %q, want %q", cfg.Categorize.Convention, "angular")
 	}
 	if cfg.Changelog.Enabled == nil || *cfg.Changelog.Enabled {
 		t.Error("changelog.enabled should be false")
@@ -169,7 +169,7 @@ func TestLoad_UnknownKeys(t *testing.T) {
 
 func TestLoad_InvalidConvention(t *testing.T) {
 	dir := t.TempDir()
-	writeConfig(t, dir, "project: go\ncommits:\n  convention: invalid\n")
+	writeConfig(t, dir, "project: go\ncategorize:\n  convention: invalid\n")
 
 	_, _, err := Load(dir)
 	if err == nil {
@@ -179,7 +179,7 @@ func TestLoad_InvalidConvention(t *testing.T) {
 
 func TestLoad_CustomConventionRequiresTypes(t *testing.T) {
 	dir := t.TempDir()
-	writeConfig(t, dir, "project: go\ncommits:\n  convention: custom\n")
+	writeConfig(t, dir, "project: go\ncategorize:\n  convention: custom\n")
 
 	_, _, err := Load(dir)
 	if err == nil {

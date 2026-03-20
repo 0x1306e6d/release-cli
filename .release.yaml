@@ -1,5 +1,6 @@
 project: go
-commits:
+
+categorize:
   convention: freeform
 
 publish:

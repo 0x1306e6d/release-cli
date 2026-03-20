@@ -52,7 +52,7 @@ func TestPipeline_FullRelease_Node(t *testing.T) {
 	cfg := &config.Config{
 		Project: "node",
 		Version: config.VersionConfig{Scheme: "semver"},
-		Commits: config.CommitsConfig{Convention: "conventional"},
+		Categorize: config.CategorizeConfig{Convention: "conventional"},
 		Changelog: config.ChangelogConfig{
 			Enabled: boolPtr(true),
 			File:    "CHANGELOG.md",
@@ -106,7 +106,7 @@ func TestPipeline_NoReleasableChanges(t *testing.T) {
 	cfg := &config.Config{
 		Project: "node",
 		Version: config.VersionConfig{Scheme: "semver"},
-		Commits: config.CommitsConfig{Convention: "conventional"},
+		Categorize: config.CategorizeConfig{Convention: "conventional"},
 		Changelog: config.ChangelogConfig{
 			Enabled: boolPtr(true),
 			File:    "CHANGELOG.md",
@@ -137,7 +137,7 @@ func TestPipeline_DryRun(t *testing.T) {
 	cfg := &config.Config{
 		Project: "node",
 		Version: config.VersionConfig{Scheme: "semver"},
-		Commits: config.CommitsConfig{Convention: "conventional"},
+		Categorize: config.CategorizeConfig{Convention: "conventional"},
 		Changelog: config.ChangelogConfig{
 			Enabled: boolPtr(true),
 			File:    "CHANGELOG.md",
@@ -179,7 +179,7 @@ func TestPipeline_FreeformConvention(t *testing.T) {
 	cfg := &config.Config{
 		Project: "node",
 		Version: config.VersionConfig{Scheme: "semver"},
-		Commits: config.CommitsConfig{Convention: "freeform"},
+		Categorize: config.CategorizeConfig{Convention: "freeform"},
 		Changelog: config.ChangelogConfig{
 			Enabled: boolPtr(true),
 			File:    "CHANGELOG.md",

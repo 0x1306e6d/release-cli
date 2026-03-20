@@ -16,7 +16,7 @@ const ConfigFileName = ".release.yaml"
 var knownTopLevelKeys = map[string]bool{
 	"project":   true,
 	"version":   true,
-	"commits":   true,
+	"categorize": true,
 	"changelog": true,
 	"propagate": true,
 	"hooks":     true,

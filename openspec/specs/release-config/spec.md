@@ -23,7 +23,7 @@ The `project` field SHALL be the only required field in `.release.yaml`. All oth
 - **THEN** the system reports a validation error indicating `project` is required
 
 ### Requirement: Config sections
-The config SHALL support the following top-level sections: `project`, `version`, `commits`, `changelog`, `propagate`, `hooks`, `publish`, `notify`.
+The config SHALL support the following top-level sections: `project`, `version`, `categorize`, `changelog`, `propagate`, `hooks`, `publish`, `notify`.
 
 #### Scenario: All sections present
 - **WHEN** the config includes all sections with valid values
@@ -53,11 +53,11 @@ The system SHALL validate the config after parsing, checking for: valid project 
 - **THEN** the system reports an error listing the valid project identifiers
 
 ### Requirement: Init command generates config
-The `release-cli init` command SHALL detect the project type and generate a `.release.yaml` with all sections — required fields filled in and optional fields commented out with descriptions.
+The `release-cli init` command SHALL detect the project type and generate a `.release.yaml` with all sections — required fields filled in and optional fields commented out with descriptions. The commit categorization section SHALL use the `categorize` key.
 
 #### Scenario: Init for a Gradle project
 - **WHEN** `release-cli init` is run in a directory with `build.gradle`
-- **THEN** a `.release.yaml` is generated with `project: java-gradle`, version scheme, commit convention, changelog, and publish sections (with optional sections commented out)
+- **THEN** a `.release.yaml` is generated with `project: java-gradle`, version scheme, `categorize` section for commit convention, changelog, and publish sections (with optional sections commented out)
 
 #### Scenario: Init does not overwrite existing config
 - **WHEN** `release-cli init` is run and `.release.yaml` already exists

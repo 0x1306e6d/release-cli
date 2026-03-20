@@ -4,7 +4,7 @@ package config
 type Config struct {
 	Project   string            `yaml:"project"`
 	Version   VersionConfig     `yaml:"version"`
-	Commits   CommitsConfig     `yaml:"commits"`
+	Categorize CategorizeConfig  `yaml:"categorize"`
 	Changelog ChangelogConfig   `yaml:"changelog"`
 	Propagate []PropagateTarget `yaml:"propagate"`
 	Hooks     HooksConfig       `yaml:"hooks"`
@@ -21,14 +21,14 @@ type VersionConfig struct {
 	Pattern  string `yaml:"pattern"`
 }
 
-// CommitsConfig configures commit analysis.
-type CommitsConfig struct {
-	Convention string           `yaml:"convention"`
-	Types      CommitTypesConfig `yaml:"types"`
+// CategorizeConfig configures commit categorization.
+type CategorizeConfig struct {
+	Convention string              `yaml:"convention"`
+	Types      CategorizeTypesConfig `yaml:"types"`
 }
 
-// CommitTypesConfig defines custom type-to-bump mappings.
-type CommitTypesConfig struct {
+// CategorizeTypesConfig defines custom type-to-bump mappings.
+type CategorizeTypesConfig struct {
 	Major []string `yaml:"major"`
 	Minor []string `yaml:"minor"`
 	Patch []string `yaml:"patch"`
@@ -95,8 +95,8 @@ func (c *Config) applyDefaults() {
 	if c.Version.Scheme == "" {
 		c.Version.Scheme = "semver"
 	}
-	if c.Commits.Convention == "" {
-		c.Commits.Convention = "conventional"
+	if c.Categorize.Convention == "" {
+		c.Categorize.Convention = "conventional"
 	}
 	if c.Changelog.Enabled == nil {
 		c.Changelog.Enabled = boolPtr(true)

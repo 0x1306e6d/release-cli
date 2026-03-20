@@ -200,20 +200,12 @@ func readCurrentVersion(dir string, det detector.Detector) (version.Semver, erro
 }
 
 func resolveConvention(cfg *config.Config) commits.Convention {
-	switch cfg.Commits.Convention {
-	case "angular":
-		return &commits.AngularCommits{}
-	case "freeform":
-		return &commits.FreeformCommits{}
-	case "custom":
-		return commits.NewCustomCommits(
-			cfg.Commits.Types.Major,
-			cfg.Commits.Types.Minor,
-			cfg.Commits.Types.Patch,
-		)
-	default:
-		return &commits.ConventionalCommits{}
-	}
+	return commits.ResolveConvention(
+		cfg.Categorize.Convention,
+		cfg.Categorize.Types.Major,
+		cfg.Categorize.Types.Minor,
+		cfg.Categorize.Types.Patch,
+	)
 }
 
 func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.Semver, parsed []commits.ParsedCommit) *Result {

@@ -87,18 +87,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 }
 
 func resolveStatusConvention(cfg *config.Config) commits.Convention {
-	switch cfg.Commits.Convention {
-	case "angular":
-		return &commits.AngularCommits{}
-	case "freeform":
-		return &commits.FreeformCommits{}
-	case "custom":
-		return commits.NewCustomCommits(
-			cfg.Commits.Types.Major,
-			cfg.Commits.Types.Minor,
-			cfg.Commits.Types.Patch,
-		)
-	default:
-		return &commits.ConventionalCommits{}
-	}
+	return commits.ResolveConvention(
+		cfg.Categorize.Convention,
+		cfg.Categorize.Types.Major,
+		cfg.Categorize.Types.Minor,
+		cfg.Categorize.Types.Patch,
+	)
 }
