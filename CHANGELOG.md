@@ -1,3 +1,8 @@
+## 0.2.0 (2026-03-23)
+- Write README with installation, usage, configuration, and CI/CD docs
+- Remove freeform as an explicit convention, default to accept-all when omitted
+- Remove duplicate release heading by passing body-only content to GitHub publish
+
 ## 0.1.0 (2026-03-23)
 
 - Add bump override input to release workflow
