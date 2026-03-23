@@ -115,6 +115,7 @@ func Run(opts Options) (*Result, error) {
 
 	// 9. Changelog.
 	var changelogContent string
+	var releaseBody string
 	if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
 		entry := changelog.Generate(newVer.String(), parsed)
 		entry.Grouped = cfg.Changes.IsGroupedChangelog()
@@ -123,8 +124,10 @@ func Run(opts Options) (*Result, error) {
 			if err != nil {
 				return nil, err
 			}
+			releaseBody = changelogContent
 		} else {
 			changelogContent = entry.Render()
+			releaseBody = entry.RenderBody()
 		}
 		if err := changelog.WriteFile(dir, cfg.Changelog.File, changelogContent); err != nil {
 			return nil, err
@@ -158,7 +161,7 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 13. Publish.
-	if err := runGitHubPublish(dir, cfg, tag, newVer.String(), changelogContent); err != nil {
+	if err := runGitHubPublish(dir, cfg, tag, newVer.String(), releaseBody); err != nil {
 		return nil, err
 	}
 

@@ -7,7 +7,7 @@ The system SHALL support publishing to GitHub Releases as the default publish ta
 - **WHEN** `publish.github.enabled: true` is configured (the default)
 - **AND** the release tag `v1.4.0` is created
 - **AND** `GITHUB_TOKEN` is set in the environment
-- **THEN** a GitHub Release is created with the tag `v1.4.0` and the changelog entry as the release body
+- **THEN** a GitHub Release is created with the tag `v1.4.0` and the changelog body without the version heading as the release body
 
 #### Scenario: Publish with artifacts
 - **WHEN** `publish.github.artifacts` includes `dist/*.tar.gz`

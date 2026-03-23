@@ -81,6 +81,56 @@ func TestRender_Ungrouped_FlatList(t *testing.T) {
 	}
 }
 
+func TestRenderBody_Grouped(t *testing.T) {
+	entry := Entry{
+		Version: "1.4.0",
+		Date:    "2026-03-18",
+		Grouped: true,
+		Groups: map[string][]string{
+			"Features":  {"add export"},
+			"Bug Fixes": {"null pointer"},
+		},
+	}
+
+	result := entry.RenderBody()
+
+	if strings.Contains(result, "## 1.4.0") {
+		t.Errorf("RenderBody should not contain version heading:\n%s", result)
+	}
+	if !strings.Contains(result, "### Features") {
+		t.Errorf("missing Features section in:\n%s", result)
+	}
+	if !strings.Contains(result, "- add export") {
+		t.Errorf("missing feature item in:\n%s", result)
+	}
+}
+
+func TestRenderBody_Ungrouped(t *testing.T) {
+	entry := Entry{
+		Version: "1.4.0",
+		Date:    "2026-03-23",
+		Grouped: false,
+		Groups: map[string][]string{
+			"Other": {"Add export feature", "Fix login bug"},
+		},
+	}
+
+	result := entry.RenderBody()
+
+	if strings.Contains(result, "## 1.4.0") {
+		t.Errorf("RenderBody should not contain version heading:\n%s", result)
+	}
+	if strings.Contains(result, "###") {
+		t.Errorf("ungrouped RenderBody should not contain ### headings:\n%s", result)
+	}
+	if !strings.Contains(result, "- Add export feature") {
+		t.Errorf("missing item in:\n%s", result)
+	}
+	if !strings.Contains(result, "- Fix login bug") {
+		t.Errorf("missing item in:\n%s", result)
+	}
+}
+
 func TestWriteFile_NewFile(t *testing.T) {
 	dir := t.TempDir()
 	content := "## 1.0.0\n\n- initial release\n"

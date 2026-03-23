@@ -36,10 +36,14 @@ func Generate(version string, parsed []commits.ParsedCommit) Entry {
 	}
 }
 
-// Render formats the entry using the default template.
+// Render formats the entry using the default template (with version heading).
 func (e Entry) Render() string {
+	return fmt.Sprintf("## %s (%s)\n", e.Version, e.Date) + e.RenderBody()
+}
+
+// RenderBody formats the entry content without the version heading line.
+func (e Entry) RenderBody() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "## %s (%s)\n", e.Version, e.Date)
 
 	writeGroup := func(label string, items []string) {
 		if e.Grouped {
