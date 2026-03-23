@@ -16,9 +16,10 @@ import (
 
 // Options holds the runtime context for a pipeline run.
 type Options struct {
-	Dir    string
-	Config *config.Config
-	DryRun bool
+	Dir          string
+	Config       *config.Config
+	DryRun       bool
+	BumpOverride *version.BumpType
 }
 
 // Result holds the outcome of a pipeline run.
@@ -67,6 +68,12 @@ func Run(opts Options) (*Result, error) {
 	conv := resolveConvention(cfg)
 	parsed, bumpType := commits.Analyze(rawCommits, conv)
 
+	// Apply bump override if provided.
+	if opts.BumpOverride != nil {
+		bumpType = opts.BumpOverride
+		report("Bump override: %s", bumpType.String())
+	}
+
 	if bumpType == nil {
 		report("No releasable changes found.")
 		return nil, nil
@@ -110,6 +117,7 @@ func Run(opts Options) (*Result, error) {
 	var changelogContent string
 	if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
 		entry := changelog.Generate(newVer.String(), parsed)
+		entry.Grouped = cfg.Changes.IsGroupedChangelog()
 		if cfg.Changelog.Template != "" {
 			changelogContent, err = changelog.RenderCustom(entry, cfg.Changelog.Template)
 			if err != nil {
@@ -200,12 +208,8 @@ func readCurrentVersion(dir string, det detector.Detector) (version.Semver, erro
 }
 
 func resolveConvention(cfg *config.Config) commits.Convention {
-	return commits.ResolveConvention(
-		cfg.Categorize.Convention,
-		cfg.Categorize.Types.Major,
-		cfg.Categorize.Types.Minor,
-		cfg.Categorize.Types.Patch,
-	)
+	conv, major, minor, patch := cfg.Changes.CommitConventionParams()
+	return commits.ResolveConvention(conv, major, minor, patch)
 }
 
 func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.Semver, parsed []commits.ParsedCommit) *Result {

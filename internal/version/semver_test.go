@@ -2,6 +2,41 @@ package version
 
 import "testing"
 
+func TestParseBumpType(t *testing.T) {
+	tests := []struct {
+		input   string
+		want    BumpType
+		wantErr bool
+	}{
+		{"major", BumpMajor, false},
+		{"minor", BumpMinor, false},
+		{"patch", BumpPatch, false},
+		{"MAJOR", BumpMajor, false},
+		{"Minor", BumpMinor, false},
+		{"PATCH", BumpPatch, false},
+		{"invalid", 0, true},
+		{"", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := ParseBumpType(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParse(t *testing.T) {
 	tests := []struct {
 		input      string

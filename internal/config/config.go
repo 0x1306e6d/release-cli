@@ -4,7 +4,7 @@ package config
 type Config struct {
 	Project   string            `yaml:"project"`
 	Version   VersionConfig     `yaml:"version"`
-	Categorize CategorizeConfig  `yaml:"categorize"`
+	Changes   ChangesConfig     `yaml:"changes"`
 	Changelog ChangelogConfig   `yaml:"changelog"`
 	Propagate []PropagateTarget `yaml:"propagate"`
 	Hooks     HooksConfig       `yaml:"hooks"`
@@ -21,17 +21,41 @@ type VersionConfig struct {
 	Pattern  string `yaml:"pattern"`
 }
 
-// CategorizeConfig configures commit categorization.
-type CategorizeConfig struct {
-	Convention string              `yaml:"convention"`
-	Types      CategorizeTypesConfig `yaml:"types"`
+// ChangesConfig configures the source of release changes.
+type ChangesConfig struct {
+	Commits *CommitsConfig `yaml:"commits"`
 }
 
-// CategorizeTypesConfig defines custom type-to-bump mappings.
-type CategorizeTypesConfig struct {
+// CommitsConfig configures commit-based change detection.
+type CommitsConfig struct {
+	Convention string           `yaml:"convention"`
+	Types      CommitTypesConfig `yaml:"types"`
+}
+
+// CommitTypesConfig defines custom type-to-bump mappings.
+type CommitTypesConfig struct {
 	Major []string `yaml:"major"`
 	Minor []string `yaml:"minor"`
 	Patch []string `yaml:"patch"`
+}
+
+// CommitConventionParams returns the convention name and type mappings
+// for commit parsing. When no commits config is present, returns
+// "freeform" with empty type lists.
+func (c *ChangesConfig) CommitConventionParams() (convention string, major, minor, patch []string) {
+	if c.Commits == nil {
+		return "freeform", nil, nil, nil
+	}
+	return c.Commits.Convention, c.Commits.Types.Major, c.Commits.Types.Minor, c.Commits.Types.Patch
+}
+
+// IsGroupedChangelog returns true when the configured convention supports
+// grouped changelog rendering (i.e., not freeform and not absent).
+func (c *ChangesConfig) IsGroupedChangelog() bool {
+	if c.Commits == nil {
+		return false
+	}
+	return c.Commits.Convention != "freeform"
 }
 
 // ChangelogConfig configures changelog generation.
@@ -95,8 +119,8 @@ func (c *Config) applyDefaults() {
 	if c.Version.Scheme == "" {
 		c.Version.Scheme = "semver"
 	}
-	if c.Categorize.Convention == "" {
-		c.Categorize.Convention = "conventional"
+	if c.Changes.Commits != nil && c.Changes.Commits.Convention == "" {
+		c.Changes.Commits.Convention = "conventional"
 	}
 	if c.Changelog.Enabled == nil {
 		c.Changelog.Enabled = boolPtr(true)

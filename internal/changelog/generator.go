@@ -15,6 +15,7 @@ type Entry struct {
 	Version string
 	Date    string
 	Groups  map[string][]string // type label → list of descriptions
+	Grouped bool                // when true, render with ### group headings
 }
 
 // Generate creates a changelog entry from parsed commits.
@@ -40,26 +41,28 @@ func (e Entry) Render() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## %s (%s)\n", e.Version, e.Date)
 
-	// Render groups in a fixed order.
-	for _, label := range groupOrder {
-		items, ok := e.Groups[label]
-		if !ok {
-			continue
+	writeGroup := func(label string, items []string) {
+		if e.Grouped {
+			fmt.Fprintf(&b, "\n### %s\n\n", label)
+		} else if b.Len() > 0 && !strings.HasSuffix(b.String(), "\n\n") {
+			b.WriteString("\n")
 		}
-		fmt.Fprintf(&b, "\n### %s\n\n", label)
 		for _, item := range items {
 			fmt.Fprintf(&b, "- %s\n", item)
 		}
 	}
 
+	// Render groups in a fixed order.
+	for _, label := range groupOrder {
+		if items, ok := e.Groups[label]; ok {
+			writeGroup(label, items)
+		}
+	}
+
 	// Render any remaining groups not in the fixed order.
 	for label, items := range e.Groups {
-		if isInOrder(label) {
-			continue
-		}
-		fmt.Fprintf(&b, "\n### %s\n\n", label)
-		for _, item := range items {
-			fmt.Fprintf(&b, "- %s\n", item)
+		if !isInOrder(label) {
+			writeGroup(label, items)
 		}
 	}
 

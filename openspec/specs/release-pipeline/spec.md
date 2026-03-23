@@ -1,11 +1,17 @@
 ## ADDED Requirements
 
 ### Requirement: Fixed pipeline step order
-The release pipeline SHALL execute steps in the following fixed order: detect → analyze commits → bump manifest → propagate → generate changelog → commit → tag → publish → notify. The user SHALL NOT be able to reorder steps.
+The release pipeline SHALL execute steps in the following fixed order: detect → analyze commits → apply bump override (if provided) → bump manifest → propagate → generate changelog → commit → tag → publish → notify. The user SHALL NOT be able to reorder steps.
 
 #### Scenario: Full pipeline execution
 - **WHEN** `release-cli release` is run
-- **THEN** steps execute in order: detect, analyze, bump, propagate, changelog, commit, tag, publish, notify
+- **THEN** steps execute in order: detect, analyze, bump override, bump manifest, propagate, changelog, commit, tag, publish, notify
+
+#### Scenario: Pipeline with bump override
+- **WHEN** `release-cli release --bump minor` is run
+- **THEN** commits are analyzed for changelog content
+- **AND** the bump override replaces the convention-derived bump
+- **AND** the pipeline continues with the overridden bump level
 
 ### Requirement: Steps can be skipped based on config
 Individual pipeline steps SHALL be skipped when their corresponding feature is disabled (e.g., changelog disabled, no publish targets, no notify targets).
@@ -58,3 +64,15 @@ The system SHALL report progress for each pipeline step as it executes, showing 
 #### Scenario: Progress output
 - **WHEN** a release is executed
 - **THEN** each step prints a status line (e.g., `✓ Bumped version: 1.3.0 → 1.4.0`, `✓ Updated CHANGELOG.md`, `✓ Tagged v1.4.0`)
+
+### Requirement: Pipeline Options include bump override
+The pipeline `Options` struct SHALL include a `BumpOverride *version.BumpType` field. When non-nil, it replaces the convention-derived bump after commit analysis.
+
+#### Scenario: Bump override applied
+- **WHEN** `Options.BumpOverride` is set to `BumpMinor`
+- **AND** commits.Analyze returns `BumpPatch`
+- **THEN** the pipeline uses `BumpMinor` for the release
+
+#### Scenario: No bump override
+- **WHEN** `Options.BumpOverride` is nil
+- **THEN** the pipeline uses the convention-derived bump type as before

@@ -87,10 +87,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 }
 
 func resolveStatusConvention(cfg *config.Config) commits.Convention {
-	return commits.ResolveConvention(
-		cfg.Categorize.Convention,
-		cfg.Categorize.Types.Major,
-		cfg.Categorize.Types.Minor,
-		cfg.Categorize.Types.Patch,
-	)
+	conv, major, minor, patch := cfg.Changes.CommitConventionParams()
+	return commits.ResolveConvention(conv, major, minor, patch)
 }

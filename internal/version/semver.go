@@ -28,6 +28,20 @@ func (b BumpType) String() string {
 	}
 }
 
+// ParseBumpType converts a string to a BumpType.
+func ParseBumpType(s string) (BumpType, error) {
+	switch strings.ToLower(s) {
+	case "major":
+		return BumpMajor, nil
+	case "minor":
+		return BumpMinor, nil
+	case "patch":
+		return BumpPatch, nil
+	default:
+		return 0, fmt.Errorf("invalid bump type %q: must be major, minor, or patch", s)
+	}
+}
+
 // Semver represents a parsed semantic version.
 type Semver struct {
 	Major      int

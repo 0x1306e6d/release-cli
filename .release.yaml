@@ -1,7 +1,8 @@
 project: go
 
-categorize:
-  convention: freeform
+changes:
+  commits:
+    convention: freeform
 
 publish:
   github:

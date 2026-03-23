@@ -35,6 +35,7 @@ func TestRender(t *testing.T) {
 	entry := Entry{
 		Version: "1.4.0",
 		Date:    "2026-03-18",
+		Grouped: true,
 		Groups: map[string][]string{
 			"Features":  {"add export"},
 			"Bug Fixes": {"null pointer"},
@@ -51,6 +52,32 @@ func TestRender(t *testing.T) {
 	}
 	if !strings.Contains(result, "- add export") {
 		t.Errorf("missing feature item in:\n%s", result)
+	}
+}
+
+func TestRender_Ungrouped_FlatList(t *testing.T) {
+	entry := Entry{
+		Version: "1.4.0",
+		Date:    "2026-03-23",
+		Grouped: false,
+		Groups: map[string][]string{
+			"Other": {"Add export feature", "Fix login bug"},
+		},
+	}
+
+	result := entry.Render()
+
+	if strings.Contains(result, "###") {
+		t.Errorf("flat render should not contain ### headings:\n%s", result)
+	}
+	if !strings.Contains(result, "## 1.4.0 (2026-03-23)") {
+		t.Errorf("missing header in:\n%s", result)
+	}
+	if !strings.Contains(result, "- Add export feature") {
+		t.Errorf("missing item in:\n%s", result)
+	}
+	if !strings.Contains(result, "- Fix login bug") {
+		t.Errorf("missing item in:\n%s", result)
 	}
 }
 

@@ -22,13 +22,15 @@ func (c *Config) validate() error {
 		errs = append(errs, fmt.Sprintf("invalid version scheme %q (valid: %s)", c.Version.Scheme, strings.Join(validSchemes, ", ")))
 	}
 
-	if !isValidEnum(c.Categorize.Convention, validConventions) {
-		errs = append(errs, fmt.Sprintf("invalid commit convention %q (valid: %s)", c.Categorize.Convention, strings.Join(validConventions, ", ")))
-	}
+	if c.Changes.Commits != nil {
+		if !isValidEnum(c.Changes.Commits.Convention, validConventions) {
+			errs = append(errs, fmt.Sprintf("invalid commit convention %q (valid: %s)", c.Changes.Commits.Convention, strings.Join(validConventions, ", ")))
+		}
 
-	if c.Categorize.Convention == "custom" {
-		if len(c.Categorize.Types.Major) == 0 && len(c.Categorize.Types.Minor) == 0 && len(c.Categorize.Types.Patch) == 0 {
-			errs = append(errs, "custom commit convention requires at least one type mapping in categorize.types")
+		if c.Changes.Commits.Convention == "custom" {
+			if len(c.Changes.Commits.Types.Major) == 0 && len(c.Changes.Commits.Types.Minor) == 0 && len(c.Changes.Commits.Types.Patch) == 0 {
+				errs = append(errs, "custom commit convention requires at least one type mapping in changes.commits.types")
+			}
 		}
 	}
 
