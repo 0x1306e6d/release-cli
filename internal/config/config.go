@@ -41,21 +41,18 @@ type CommitTypesConfig struct {
 
 // CommitConventionParams returns the convention name and type mappings
 // for commit parsing. When no commits config is present, returns
-// "freeform" with empty type lists.
+// empty convention with empty type lists.
 func (c *ChangesConfig) CommitConventionParams() (convention string, major, minor, patch []string) {
 	if c.Commits == nil {
-		return "freeform", nil, nil, nil
+		return "", nil, nil, nil
 	}
 	return c.Commits.Convention, c.Commits.Types.Major, c.Commits.Types.Minor, c.Commits.Types.Patch
 }
 
-// IsGroupedChangelog returns true when the configured convention supports
-// grouped changelog rendering (i.e., not freeform and not absent).
+// IsGroupedChangelog returns true when a commit convention is configured,
+// meaning the changelog should use grouped rendering.
 func (c *ChangesConfig) IsGroupedChangelog() bool {
-	if c.Commits == nil {
-		return false
-	}
-	return c.Commits.Convention != "freeform"
+	return c.Commits != nil
 }
 
 // ChangelogConfig configures changelog generation.

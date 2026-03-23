@@ -180,7 +180,7 @@ func TestPipeline_FreeformConvention(t *testing.T) {
 	cfg := &config.Config{
 		Project: "node",
 		Version: config.VersionConfig{Scheme: "semver"},
-		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "freeform"}},
+		// No Changes configured — defaults to accept-all, flat changelog
 		Changelog: config.ChangelogConfig{
 			Enabled: boolPtr(true),
 			File:    "CHANGELOG.md",
@@ -195,20 +195,20 @@ func TestPipeline_FreeformConvention(t *testing.T) {
 		t.Fatalf("pipeline error: %v", err)
 	}
 	if result == nil {
-		t.Fatal("expected result, got nil — freeform should treat all commits as releasable")
+		t.Fatal("expected result, got nil — no convention should treat all commits as releasable")
 	}
 
 	if result.NewVersion != "1.0.1" {
-		t.Errorf("new version = %q, want %q (freeform = patch bump)", result.NewVersion, "1.0.1")
+		t.Errorf("new version = %q, want %q (no convention = patch bump)", result.NewVersion, "1.0.1")
 	}
 	if result.TagName != "v1.0.1" {
 		t.Errorf("tag = %q, want %q", result.TagName, "v1.0.1")
 	}
 
-	// Verify flat changelog (no ### headings) for freeform convention.
+	// Verify flat changelog (no ### headings) when no convention is configured.
 	changelog, _ := os.ReadFile(filepath.Join(dir, "CHANGELOG.md"))
 	if strings.Contains(string(changelog), "###") {
-		t.Errorf("freeform changelog should not have ### headings:\n%s", changelog)
+		t.Errorf("no-convention changelog should not have ### headings:\n%s", changelog)
 	}
 }
 
@@ -268,7 +268,7 @@ func TestPipeline_NoCategorize_FlatChangelog(t *testing.T) {
 	cfg := &config.Config{
 		Project: "node",
 		Version: config.VersionConfig{Scheme: "semver"},
-		// No Changes configured — defaults to freeform, flat changelog
+		// No Changes configured — defaults to accept-all, flat changelog
 		Changelog: config.ChangelogConfig{
 			Enabled: boolPtr(true),
 			File:    "CHANGELOG.md",

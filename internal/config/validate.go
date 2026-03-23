@@ -7,7 +7,7 @@ import (
 
 var (
 	validSchemes     = []string{"semver"}
-	validConventions = []string{"conventional", "angular", "freeform", "custom"}
+	validConventions = []string{"conventional", "angular", "custom"}
 )
 
 // validate checks the config for errors.

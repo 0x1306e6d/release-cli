@@ -41,7 +41,7 @@ When multiple commits have different bump implications, the system SHALL use the
 - **THEN** the determined bump type is `minor` (higher than patch)
 
 ### Requirement: Configurable commit convention
-The system SHALL allow configuring the commit convention in `.release.yaml` under the `changes.commits` key. Supported values SHALL include `conventional`, `angular`, `freeform`, and `custom`. A `custom` option SHALL allow defining arbitrary type-to-bump mappings. When `changes.commits` is absent, the system SHALL use freeform behavior internally (accept all commits, patch bump).
+The system SHALL allow configuring the commit convention in `.release.yaml` under the `changes.commits` key. Supported values SHALL include `conventional`, `angular`, and `custom`. A `custom` option SHALL allow defining arbitrary type-to-bump mappings. When `changes.commits` is absent, the system SHALL accept all commits as releasable with patch bump and flat changelog.
 
 #### Scenario: Custom commit convention
 - **WHEN** the config specifies `changes.commits.convention: custom` with `minor: ["feature", "enhancement"]`
@@ -53,14 +53,9 @@ The system SHALL allow configuring the commit convention in `.release.yaml` unde
 - **AND** commits follow Angular commit format
 - **THEN** the system parses them according to Angular conventions
 
-#### Scenario: Freeform convention
-- **WHEN** the config specifies `changes.commits.convention: freeform`
-- **AND** commits use plain English messages
-- **THEN** every commit is treated as a releasable patch-level change
-
-#### Scenario: No changes section defaults to freeform behavior
+#### Scenario: No changes section defaults to accept-all behavior
 - **WHEN** the config does not include a `changes` section
-- **THEN** the system SHALL accept all commits as releasable with patch bump (freeform behavior)
+- **THEN** the system SHALL accept all commits as releasable with patch bump
 
 ### Requirement: Non-conforming commits are ignored for bump calculation
 Commits that do not match the configured convention SHALL be ignored when determining the bump type but MAY be included in the changelog under an "Other" category.

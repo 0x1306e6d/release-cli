@@ -1,9 +1,5 @@
 project: go
 
-changes:
-  commits:
-    convention: freeform
-
 publish:
   github:
     artifacts:

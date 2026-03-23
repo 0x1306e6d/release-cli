@@ -96,7 +96,7 @@ func generateConfig(project string, snapshot bool) string {
 
 	b.WriteString("\n# changes:\n")
 	b.WriteString("#   commits:\n")
-	b.WriteString("#     convention: conventional  # conventional, angular, freeform, custom\n")
+	b.WriteString("#     convention: conventional  # conventional, angular, custom\n")
 
 	b.WriteString("\n# changelog:\n")
 	b.WriteString("#   enabled: true\n")
