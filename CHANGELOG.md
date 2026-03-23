@@ -1,3 +1,9 @@
+## 0.1.0 (2026-03-23)
+
+- Add bump override input to release workflow
+- Replace categorize with changes.commits, add --bump override and flat changelog
+- Rename commits config section to categorize
+
 ## 0.0.2 (2026-03-18)
 
 ### Other
