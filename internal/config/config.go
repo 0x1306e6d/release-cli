@@ -3,6 +3,8 @@ package config
 // Config represents the full .release.yaml configuration.
 type Config struct {
 	Project   string            `yaml:"project"`
+	Name      string            `yaml:"name"`
+	Modules   []string          `yaml:"modules"`
 	Version   VersionConfig     `yaml:"version"`
 	Changes   ChangesConfig     `yaml:"changes"`
 	Changelog ChangelogConfig   `yaml:"changelog"`
@@ -10,6 +12,11 @@ type Config struct {
 	Hooks     HooksConfig       `yaml:"hooks"`
 	Publish   PublishConfig     `yaml:"publish"`
 	Notify    NotifyConfig      `yaml:"notify"`
+}
+
+// IsMonorepo returns true when the config declares child modules.
+func (c *Config) IsMonorepo() bool {
+	return len(c.Modules) > 0
 }
 
 // VersionConfig configures version management.

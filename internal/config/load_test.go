@@ -201,6 +201,78 @@ func TestLoad_PropagateRequiresStrategy(t *testing.T) {
 	}
 }
 
+func TestLoad_MonorepoWithNameAndModules(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `name: my-project
+project: go
+modules:
+  - cli
+  - workflow
+`)
+
+	cfg, warnings, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+	if cfg.Name != "my-project" {
+		t.Errorf("name = %q, want %q", cfg.Name, "my-project")
+	}
+	if len(cfg.Modules) != 2 {
+		t.Fatalf("modules count = %d, want 2", len(cfg.Modules))
+	}
+	if cfg.Modules[0] != "cli" || cfg.Modules[1] != "workflow" {
+		t.Errorf("modules = %v, want [cli workflow]", cfg.Modules)
+	}
+	if !cfg.IsMonorepo() {
+		t.Error("IsMonorepo() should return true when modules are declared")
+	}
+}
+
+func TestLoad_ModulesWithoutName(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `project: go
+modules:
+  - cli
+`)
+
+	_, _, err := Load(dir)
+	if err == nil {
+		t.Fatal("expected validation error for modules without name")
+	}
+}
+
+func TestLoad_SingleProjectIsNotMonorepo(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, "project: go\n")
+
+	cfg, _, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.IsMonorepo() {
+		t.Error("IsMonorepo() should return false for single-project config")
+	}
+}
+
+func TestLoad_NameIgnoredWithoutModules(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, "name: foo\nproject: go\n")
+
+	cfg, _, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Name != "foo" {
+		t.Errorf("name = %q, want %q", cfg.Name, "foo")
+	}
+	if cfg.IsMonorepo() {
+		t.Error("IsMonorepo() should return false when no modules declared")
+	}
+}
+
 func writeConfig(t *testing.T, dir, content string) {
 	t.Helper()
 	err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0644)

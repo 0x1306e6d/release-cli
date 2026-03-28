@@ -18,6 +18,10 @@ func (c *Config) validate() error {
 		errs = append(errs, "project is required")
 	}
 
+	if len(c.Modules) > 0 && c.Name == "" {
+		errs = append(errs, `"name" is required when "modules" is declared`)
+	}
+
 	if !isValidEnum(c.Version.Scheme, validSchemes) {
 		errs = append(errs, fmt.Sprintf("invalid version scheme %q (valid: %s)", c.Version.Scheme, strings.Join(validSchemes, ", ")))
 	}

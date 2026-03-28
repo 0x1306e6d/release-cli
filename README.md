@@ -14,6 +14,7 @@ release-cli detects your project type, analyzes commits, bumps versions, generat
 - **GitHub Releases** -- Publish releases with artifact uploads
 - **Lifecycle hooks** -- Run scripts at pre-bump, post-bump, pre-publish, post-publish
 - **Snapshot mode** -- Development versions (e.g., `-SNAPSHOT`, `.dev0`)
+- **Monorepo support** -- Hierarchical multi-package releases with cascading, batched commits, and namespaced tags
 - **Dry-run mode** -- Preview the entire release without executing
 
 ## Installation
@@ -64,9 +65,11 @@ Executes the full release pipeline: bump version, generate changelog, commit, ta
 release-cli release [flags]
 ```
 
-| Flag     | Description                                        |
-| -------- | -------------------------------------------------- |
-| `--bump` | Override bump level (`major`, `minor`, or `patch`) |
+| Flag        | Description                                        |
+| ----------- | -------------------------------------------------- |
+| `--bump`    | Override bump level (`major`, `minor`, or `patch`) |
+| `--package` | Release specific package(s) in monorepo mode       |
+| `--all`     | Release all packages (monorepo mode)               |
 
 ### `init`
 
@@ -78,11 +81,16 @@ release-cli init
 
 ### `status`
 
-Shows the current version, last release tag, commits since last release, and a preview of the next version.
+Shows the current version, last release tag, commits since last release, and a preview of the next version. In monorepo mode, displays a summary table for all packages.
 
 ```bash
 release-cli status
+release-cli status --package cli   # Detailed status for a specific package
 ```
+
+| Flag        | Description                                   |
+| ----------- | --------------------------------------------- |
+| `--package` | Show status for a specific package (monorepo) |
 
 ### Global Flags
 
@@ -159,6 +167,62 @@ notify:
 ```
 
 Environment variables can be referenced with `${VAR_NAME}` syntax in string values.
+
+### Monorepo Configuration
+
+For repositories with multiple independently versioned packages, each package gets its own `.release.yaml`. A parent declares its children via the `modules` field.
+
+```yaml
+# .release.yaml (root)
+name: my-project
+project: go
+modules:
+  - cli
+  - workflow
+```
+
+```yaml
+# cli/.release.yaml
+project: node
+```
+
+```yaml
+# workflow/.release.yaml
+project: go
+modules:
+  - sub
+```
+
+```yaml
+# workflow/sub/.release.yaml
+project: go
+```
+
+Key rules:
+
+- `name` is required when `modules` is declared -- it becomes the git tag prefix (e.g., `my-project/v1.2.0`)
+- Child packages use their relative path as the tag prefix (e.g., `cli/v1.0.0`, `workflow/sub/v0.3.0`)
+- Each `.release.yaml` is fully independent -- no config inheritance between parent and child
+- Selecting a parent for release cascades to all its descendants
+
+#### Releasing in monorepo mode
+
+```bash
+release-cli release --package cli                    # Release a single package
+release-cli release --package cli --package workflow  # Release multiple packages
+release-cli release --all                            # Release the entire tree
+```
+
+When a parent is selected, all descendants are force-released (even those without new commits get a patch bump). A cascading release produces one batched commit with one tag per package:
+
+```
+commit: "Release my-project 0.3.0, cli 0.3.0, workflow 0.1.5"
+  -> tag: my-project/v0.3.0
+  -> tag: cli/v0.3.0
+  -> tag: workflow/v0.1.5
+```
+
+Commit analysis is path-scoped: only commits touching files under a package's directory contribute to its bump and changelog. Parent packages see all commits under their path, including children's.
 
 ### Behavior Without `changes.commits`
 
@@ -269,6 +333,62 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+### Monorepo Release
+
+```yaml
+name: Release Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to release (or 'all')"
+        required: true
+        type: string
+      bump:
+        description: "Version bump level"
+        required: false
+        type: choice
+        options:
+          - ""
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install release-cli
+        run: go install github.com/0x1306e6d/release-cli/cmd/release-cli@latest
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Release
+        run: |
+          if [ "${{ inputs.package }}" = "all" ]; then
+            release-cli release --all ${{ inputs.bump && format('--bump {0}', inputs.bump) || '' }}
+          else
+            release-cli release --package ${{ inputs.package }} ${{ inputs.bump && format('--bump {0}', inputs.bump) || '' }}
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
 ## Environment Variables
 
 | Variable            | Description                                               |
@@ -279,12 +399,14 @@ jobs:
 
 ## Lifecycle Hooks
 
-Hooks run shell commands at key stages of the release pipeline. The following variables are injected:
+Hooks run shell commands at key stages of the release pipeline. The following environment variables are injected:
 
-| Variable           | Description                |
-| ------------------ | -------------------------- |
-| `VERSION`          | New version being released |
-| `PREVIOUS_VERSION` | Previous version           |
-| `PROJECT`          | Project type               |
+| Variable               | Description                                        |
+| ---------------------- | -------------------------------------------------- |
+| `RELEASE_VERSION`      | New version being released                         |
+| `RELEASE_PREV_VERSION` | Previous version                                   |
+| `RELEASE_PROJECT`      | Project type                                       |
+| `RELEASE_PACKAGE`      | Package name (monorepo only)                       |
+| `RELEASE_PACKAGE_PATH` | Package path relative to repo root (monorepo only) |
 
 A non-zero exit code from any hook aborts the release.

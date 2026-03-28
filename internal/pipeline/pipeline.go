@@ -3,6 +3,7 @@ package pipeline
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/0x1306e6d/release-cli/internal/changelog"
 	"github.com/0x1306e6d/release-cli/internal/commits"
@@ -14,12 +15,22 @@ import (
 	"github.com/0x1306e6d/release-cli/internal/version"
 )
 
+// PackageContext provides monorepo package context for scoped pipeline operations.
+// When nil, the pipeline runs in single-project mode.
+type PackageContext struct {
+	Name      string // Package name (used in commit messages and tag prefix)
+	Path      string // Relative path from repo root (e.g., "cli", "workflow/sub")
+	TagPrefix string // Tag prefix for namespaced tags (e.g., "cli", "my-app")
+	IsForced  bool   // If true, force a patch bump even when no commits found
+}
+
 // Options holds the runtime context for a pipeline run.
 type Options struct {
 	Dir          string
 	Config       *config.Config
 	DryRun       bool
 	BumpOverride *version.BumpType
+	Package      *PackageContext // nil for single-project mode
 }
 
 // Result holds the outcome of a pipeline run.
@@ -33,17 +44,30 @@ type Result struct {
 func Run(opts Options) (*Result, error) {
 	cfg := opts.Config
 	dir := opts.Dir
+	pkg := opts.Package
+
+	// Resolve scoped paths for monorepo.
+	detectDir := dir
+	var tagPrefix string
+	var pathFilter string
+	if pkg != nil {
+		if pkg.Path != "" {
+			detectDir = filepath.Join(dir, pkg.Path)
+		}
+		tagPrefix = pkg.TagPrefix
+		pathFilter = pkg.Path
+	}
 
 	// 1. Detect project type.
 	registry := detector.DefaultRegistry()
-	det, err := registry.Resolve(cfg.Project, dir)
+	det, err := registry.Resolve(cfg.Project, detectDir)
 	if err != nil {
 		return nil, err
 	}
 	report("Detected project type: %s", det.Name())
 
 	// 2. Read current version.
-	prevVer, err := readCurrentVersion(dir, det)
+	prevVer, err := readCurrentVersion(dir, det, detectDir, tagPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("reading current version: %w", err)
 	}
@@ -51,11 +75,11 @@ func Run(opts Options) (*Result, error) {
 
 	// 3. Analyze commits.
 	fromTag := ""
-	if prevVer.Major != 0 || prevVer.Minor != 0 || prevVer.Patch != 0 {
-		fromTag = prevVer.StripPreRelease().TagString()
+	if !prevVer.IsZero() {
+		fromTag = git.NamespacedTagString(tagPrefix, prevVer.StripPreRelease())
 	}
 
-	gitCommits, err := git.LogBetween(dir, fromTag, "HEAD")
+	gitCommits, err := git.LogBetween(dir, fromTag, "HEAD", pathFilter)
 	if err != nil {
 		return nil, fmt.Errorf("reading commit log: %w", err)
 	}
@@ -75,8 +99,15 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	if bumpType == nil {
-		report("No releasable changes found.")
-		return nil, nil
+		if pkg != nil && pkg.IsForced {
+			// Forced release in cascade mode: default to patch bump.
+			patch := version.BumpPatch
+			bumpType = &patch
+			report("No releasable changes found, forced patch bump")
+		} else {
+			report("No releasable changes found.")
+			return nil, nil
+		}
 	}
 	report("Bump type: %s (%d releasable commits)", bumpType.String(), len(parsed))
 
@@ -86,30 +117,36 @@ func Run(opts Options) (*Result, error) {
 	report("Version bump: %s → %s", prevVer.CoreString(), newVer.String())
 
 	if opts.DryRun {
-		return dryRunReport(cfg, det, prevVer, newVer, parsed), nil
+		return dryRunReport(cfg, det, prevVer, newVer, parsed, tagPrefix), nil
+	}
+
+	// Build hook options for monorepo package context.
+	var hookOpts []HookOptions
+	if pkg != nil {
+		hookOpts = []HookOptions{{PackageName: pkg.Name, PackagePath: pkg.Path}}
 	}
 
 	// 5. Pre-bump hook.
-	if err := RunHook(dir, cfg.Hooks.PreBump, newVer.String(), prevVer.CoreString(), cfg.Project); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PreBump, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
 	// 6. Bump manifest.
-	if err := det.WriteVersion(dir, detector.Version{Raw: newVer.String()}); err != nil {
+	if err := det.WriteVersion(detectDir, detector.Version{Raw: newVer.String()}); err != nil {
 		return nil, fmt.Errorf("writing version: %w", err)
 	}
 	report("✓ Bumped version: %s → %s", prevVer.CoreString(), newVer.String())
 
 	// 7. Propagate.
 	if len(cfg.Propagate) > 0 {
-		if err := propagate.Propagate(dir, cfg.Propagate, newVer.String()); err != nil {
+		if err := propagate.Propagate(detectDir, cfg.Propagate, newVer.String()); err != nil {
 			return nil, err
 		}
 		report("✓ Propagated version to %d targets", len(cfg.Propagate))
 	}
 
 	// 8. Post-bump hook.
-	if err := RunHook(dir, cfg.Hooks.PostBump, newVer.String(), prevVer.CoreString(), cfg.Project); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PostBump, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
@@ -129,22 +166,28 @@ func Run(opts Options) (*Result, error) {
 			changelogContent = entry.Render()
 			releaseBody = entry.RenderBody()
 		}
-		if err := changelog.WriteFile(dir, cfg.Changelog.File, changelogContent); err != nil {
+		if err := changelog.WriteFile(detectDir, cfg.Changelog.File, changelogContent); err != nil {
 			return nil, err
 		}
 		report("✓ Updated %s", cfg.Changelog.File)
 	}
 
 	// 10. Commit.
-	commitMsg := fmt.Sprintf("Release %s", newVer.String())
+	var commitLabel string
+	if pkg != nil {
+		commitLabel = pkg.Name + " " + newVer.String()
+	} else {
+		commitLabel = newVer.String()
+	}
+	commitMsg := fmt.Sprintf("Release %s", commitLabel)
 	if err := git.CreateCommit(dir, commitMsg, "."); err != nil {
 		return nil, fmt.Errorf("creating release commit: %w", err)
 	}
 	report("✓ Created release commit")
 
 	// 11. Tag.
-	tag := newVer.TagString()
-	if err := git.CreateTag(dir, tag, fmt.Sprintf("Release %s", newVer.String())); err != nil {
+	tag := git.NamespacedTagString(tagPrefix, newVer)
+	if err := git.CreateTag(dir, tag, fmt.Sprintf("Release %s", commitLabel)); err != nil {
 		return nil, err
 	}
 	report("✓ Tagged %s", tag)
@@ -156,7 +199,7 @@ func Run(opts Options) (*Result, error) {
 	report("✓ Pushed commit and tag to remote")
 
 	// 12. Pre-publish hook.
-	if err := RunHook(dir, cfg.Hooks.PrePublish, newVer.String(), prevVer.CoreString(), cfg.Project); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PrePublish, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
@@ -166,7 +209,7 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 14. Post-publish hook.
-	if err := RunHook(dir, cfg.Hooks.PostPublish, newVer.String(), prevVer.CoreString(), cfg.Project); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PostPublish, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
@@ -176,15 +219,18 @@ func Run(opts Options) (*Result, error) {
 	// 16. SNAPSHOT post-release.
 	if cfg.Version.Snapshot && det.SnapshotSuffix() != "" {
 		snapVer := version.NextSnapshot(newVer, version.NormalizeSnapshotSuffix(det.SnapshotSuffix()))
-		if err := det.WriteVersion(dir, detector.Version{Raw: snapVer.String()}); err != nil {
+		if err := det.WriteVersion(detectDir, detector.Version{Raw: snapVer.String()}); err != nil {
 			return nil, fmt.Errorf("writing snapshot version: %w", err)
 		}
 		snapMsg := "Prepare next development iteration"
+		if pkg != nil {
+			snapMsg += " for " + pkg.Name
+		}
 		if err := git.CreateCommit(dir, snapMsg, "."); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
 		report("✓ Bumped to next development version: %s", snapVer.String())
-		if err := git.Push(dir, ""); err != nil {
+		if err := git.Push(dir); err != nil {
 			return nil, fmt.Errorf("pushing snapshot commit: %w", err)
 		}
 		report("✓ Pushed snapshot commit to remote")
@@ -197,15 +243,15 @@ func Run(opts Options) (*Result, error) {
 	}, nil
 }
 
-func readCurrentVersion(dir string, det detector.Detector) (version.Semver, error) {
+func readCurrentVersion(dir string, det detector.Detector, detectDir, tagPrefix string) (version.Semver, error) {
 	// For Go (or any tag-based detector with no manifest), read from git tags.
-	v, err := det.ReadVersion(dir)
+	v, err := det.ReadVersion(detectDir)
 	if err != nil {
 		return version.Semver{}, err
 	}
 	if v.Raw == "" {
-		// Tag-based ecosystem: read from git tags.
-		return git.LatestSemverTag(dir)
+		// Tag-based ecosystem: read from git tags (with optional prefix).
+		return git.LatestSemverTag(dir, tagPrefix)
 	}
 	return version.Parse(v.Raw)
 }
@@ -215,7 +261,7 @@ func resolveConvention(cfg *config.Config) commits.Convention {
 	return commits.ResolveConvention(conv, major, minor, patch)
 }
 
-func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.Semver, parsed []commits.ParsedCommit) *Result {
+func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.Semver, parsed []commits.ParsedCommit, tagPrefix string) *Result {
 	report("[dry-run] Would bump: %s → %s", prev.CoreString(), next.String())
 	if len(cfg.Propagate) > 0 {
 		report("[dry-run] Would propagate to %d files", len(cfg.Propagate))
@@ -223,7 +269,8 @@ func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.
 	if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
 		report("[dry-run] Would update %s", cfg.Changelog.File)
 	}
-	report("[dry-run] Would create tag %s", next.TagString())
+	tag := git.NamespacedTagString(tagPrefix, next)
+	report("[dry-run] Would create tag %s", tag)
 	if cfg.Publish.GitHub.Enabled == nil || *cfg.Publish.GitHub.Enabled {
 		report("[dry-run] Would publish GitHub Release")
 	}
@@ -234,7 +281,7 @@ func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.
 	return &Result{
 		PrevVersion: prev.CoreString(),
 		NewVersion:  next.String(),
-		TagName:     next.TagString(),
+		TagName:     tag,
 	}
 }
 

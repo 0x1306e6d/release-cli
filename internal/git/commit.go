@@ -14,7 +14,8 @@ type CommitLog struct {
 
 // LogBetween returns commits between fromRef and toRef (exclusive fromRef).
 // If fromRef is empty, returns all commits up to toRef.
-func LogBetween(dir string, fromRef, toRef string) ([]CommitLog, error) {
+// An optional pathFilter restricts results to commits touching files under that path.
+func LogBetween(dir string, fromRef, toRef string, pathFilter ...string) ([]CommitLog, error) {
 	var rangeSpec string
 	if fromRef == "" {
 		rangeSpec = toRef
@@ -26,7 +27,12 @@ func LogBetween(dir string, fromRef, toRef string) ([]CommitLog, error) {
 	const sep = "---RELEASE_CLI_SEP---"
 	format := fmt.Sprintf("%%H%s%%s%s%%b%s", sep, sep, sep)
 
-	out, err := run(dir, "log", "--format="+format, rangeSpec)
+	args := []string{"log", "--format=" + format, rangeSpec}
+	if len(pathFilter) > 0 && pathFilter[0] != "" {
+		args = append(args, "--", pathFilter[0])
+	}
+
+	out, err := run(dir, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +41,7 @@ func LogBetween(dir string, fromRef, toRef string) ([]CommitLog, error) {
 	}
 
 	var commits []CommitLog
-	entries := strings.Split(out, sep+"\n")
-	// Rebuild from the raw format: each commit produces hash<sep>subject<sep>body<sep>
-	// We split on <sep> tokens.
+	// Each commit produces hash<sep>subject<sep>body<sep>.
 	raw := strings.Split(out, sep)
 	for i := 0; i+2 < len(raw); i += 3 {
 		hash := strings.TrimSpace(raw[i])
@@ -55,7 +59,6 @@ func LogBetween(dir string, fromRef, toRef string) ([]CommitLog, error) {
 		})
 	}
 
-	_ = entries // unused, using raw split instead
 	return commits, nil
 }
 

@@ -12,18 +12,26 @@ The system SHALL read configuration from `.release.yaml` in the project root dir
 - **THEN** the system SHALL report an error and suggest running `release-cli init`
 
 ### Requirement: Only project field is required
-The `project` field SHALL be the only required field in `.release.yaml`. All other fields SHALL have sensible defaults. When `changes` is absent, the system SHALL accept all commits without categorization.
+The config SHALL require a `project` field. Optionally, it MAY include a `modules` list (making it a parent in a monorepo) and a `name` field (required when `modules` is present). All other fields SHALL have sensible defaults. When `changes` is absent, the system SHALL accept all commits without categorization.
 
-#### Scenario: Minimal config
+#### Scenario: Minimal single-project config
 - **WHEN** the config contains only `project: go`
-- **THEN** the system operates with default values: semver, no categorization (all commits accepted, flat changelog, patch bump), changelog enabled, GitHub publish enabled
+- **THEN** the system operates in single-project mode with default values: semver, no categorization (all commits accepted, flat changelog, patch bump), changelog enabled, GitHub publish enabled
+
+#### Scenario: Minimal monorepo parent config
+- **WHEN** the config contains `name: my-project`, `project: go`, and `modules: [cli, lib]`
+- **THEN** the system operates in monorepo mode, loading child configs from `cli/.release.yaml` and `lib/.release.yaml`
 
 #### Scenario: Missing project field
 - **WHEN** the config file exists but has no `project` field
 - **THEN** the system reports a validation error indicating `project` is required
 
+#### Scenario: Modules without name
+- **WHEN** the config has `project: go` and `modules: [cli]` but no `name`
+- **THEN** the system reports a validation error: `"name" is required when "modules" is declared`
+
 ### Requirement: Config sections
-The config SHALL support the following top-level sections: `project`, `version`, `changes`, `changelog`, `propagate`, `hooks`, `publish`, `notify`. The `changes` section SHALL contain source-specific sub-sections (e.g., `changes.commits`).
+The config SHALL support the following top-level sections: `project`, `name`, `version`, `changes`, `changelog`, `propagate`, `hooks`, `publish`, `notify`, `modules`. The `changes` section SHALL contain source-specific sub-sections (e.g., `changes.commits`). The `modules` section SHALL be a list of relative directory paths.
 
 #### Scenario: All sections present
 - **WHEN** the config includes all sections with valid values
@@ -46,11 +54,19 @@ The system SHALL support `${ENV_VAR}` syntax in string values to reference envir
 - **THEN** the system SHALL report an error indicating the missing variable
 
 ### Requirement: Config validation
-The system SHALL validate the config after parsing, checking for: valid project identifier, valid versioning scheme, valid commit convention, valid propagation targets, and valid publish/notify configurations.
+The system SHALL validate the config after parsing, checking for: valid project identifier, valid versioning scheme, valid commit convention, valid propagation targets, valid publish/notify configurations. When `modules` is present, additionally validate: `name` is set, each child directory exists, each child has a valid `.release.yaml`, no circular references, no overlapping sibling paths.
 
 #### Scenario: Invalid project identifier
 - **WHEN** the config specifies `project: unknown-lang`
 - **THEN** the system reports an error listing the valid project identifiers
+
+#### Scenario: Child with invalid config
+- **WHEN** root declares `modules: [cli]` and `cli/.release.yaml` has an invalid project identifier
+- **THEN** the system reports an error: `package "cli": invalid project identifier "unknown-lang"`
+
+#### Scenario: Overlapping sibling paths
+- **WHEN** root declares `modules: [a, a/b]`
+- **THEN** the system reports a validation error about overlapping package paths
 
 ### Requirement: Init command generates config
 The `release-cli init` command SHALL detect the project type and generate a `.release.yaml` with all sections — required fields filled in and optional fields commented out with descriptions. The `changes.commits` section SHALL be included as a commented example listing `conventional`, `angular`, and `custom` as valid conventions.

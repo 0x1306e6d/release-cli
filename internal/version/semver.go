@@ -122,6 +122,11 @@ func (v Semver) CoreString() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
+// IsZero returns true if the version is 0.0.0 (no previous release).
+func (v Semver) IsZero() bool {
+	return v.Major == 0 && v.Minor == 0 && v.Patch == 0
+}
+
 // IsPreRelease returns true if the version has a pre-release suffix.
 func (v Semver) IsPreRelease() bool {
 	return v.PreRelease != ""

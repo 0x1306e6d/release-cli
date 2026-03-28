@@ -300,6 +300,181 @@ func TestPipeline_NoCategorize_FlatChangelog(t *testing.T) {
 	}
 }
 
+func TestPipeline_MonorepoSinglePackage(t *testing.T) {
+	dir := initTestRepo(t)
+
+	// Create root with a "cli" module.
+	os.MkdirAll(filepath.Join(dir, "cli"), 0755)
+	os.WriteFile(filepath.Join(dir, "cli", "package.json"), []byte(`{"name": "cli", "version": "1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "cli/v1.0.0", "-m", "cli v1.0.0")
+
+	// Add a feature commit touching cli/.
+	os.WriteFile(filepath.Join(dir, "cli", "feature.js"), []byte("// new"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add cli feature")
+
+	cfg := &config.Config{
+		Project: "node",
+		Version: config.VersionConfig{Scheme: "semver"},
+		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{
+			Enabled: boolPtr(true),
+			File:    "CHANGELOG.md",
+		},
+		Publish: config.PublishConfig{
+			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},
+		},
+	}
+
+	result, err := Run(Options{
+		Dir:    dir,
+		Config: cfg,
+		Package: &PackageContext{
+			Name:      "cli",
+			Path:      "cli",
+			TagPrefix: "cli",
+		},
+	})
+	if err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+
+	if result.NewVersion != "1.1.0" {
+		t.Errorf("new version = %q, want %q", result.NewVersion, "1.1.0")
+	}
+	if result.TagName != "cli/v1.1.0" {
+		t.Errorf("tag = %q, want %q", result.TagName, "cli/v1.1.0")
+	}
+
+	// Verify changelog written under cli/.
+	changelog, _ := os.ReadFile(filepath.Join(dir, "cli", "CHANGELOG.md"))
+	if !strings.Contains(string(changelog), "1.1.0") {
+		t.Errorf("cli/CHANGELOG.md not created: %s", changelog)
+	}
+}
+
+func TestPipeline_MonorepoForcedRelease(t *testing.T) {
+	dir := initTestRepo(t)
+
+	// Create root with a "lib" module.
+	os.MkdirAll(filepath.Join(dir, "lib"), 0755)
+	os.WriteFile(filepath.Join(dir, "lib", "package.json"), []byte(`{"name": "lib", "version": "1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "lib/v1.0.0", "-m", "lib v1.0.0")
+
+	// Add a commit that does NOT touch lib/ — only root.
+	os.WriteFile(filepath.Join(dir, "root.txt"), []byte("root change"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: root change")
+
+	cfg := &config.Config{
+		Project: "node",
+		Version: config.VersionConfig{Scheme: "semver"},
+		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{
+			Enabled: boolPtr(true),
+			File:    "CHANGELOG.md",
+		},
+		Publish: config.PublishConfig{
+			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},
+		},
+	}
+
+	// Without forced: no releasable changes for lib.
+	result, err := Run(Options{
+		Dir:    dir,
+		Config: cfg,
+		Package: &PackageContext{
+			Name:      "lib",
+			Path:      "lib",
+			TagPrefix: "lib",
+			IsForced:  false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil result when no commits touch lib/")
+	}
+
+	// With forced: should get a patch bump.
+	result, err = Run(Options{
+		Dir:    dir,
+		Config: cfg,
+		Package: &PackageContext{
+			Name:      "lib",
+			Path:      "lib",
+			TagPrefix: "lib",
+			IsForced:  true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result with forced release")
+	}
+	if result.NewVersion != "1.0.1" {
+		t.Errorf("new version = %q, want %q (forced patch)", result.NewVersion, "1.0.1")
+	}
+	if result.TagName != "lib/v1.0.1" {
+		t.Errorf("tag = %q, want %q", result.TagName, "lib/v1.0.1")
+	}
+}
+
+func TestPipeline_PathFilterExcludesOtherPackages(t *testing.T) {
+	dir := initTestRepo(t)
+
+	// Create two modules: cli and lib.
+	os.MkdirAll(filepath.Join(dir, "cli"), 0755)
+	os.MkdirAll(filepath.Join(dir, "lib"), 0755)
+	os.WriteFile(filepath.Join(dir, "cli", "package.json"), []byte(`{"name": "cli", "version": "1.0.0"}`), 0644)
+	os.WriteFile(filepath.Join(dir, "lib", "package.json"), []byte(`{"name": "lib", "version": "1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "cli/v1.0.0", "-m", "cli v1.0.0")
+	mustGit(t, dir, "tag", "-a", "lib/v1.0.0", "-m", "lib v1.0.0")
+
+	// Add commit only in lib/.
+	os.WriteFile(filepath.Join(dir, "lib", "feature.js"), []byte("// lib feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: lib feature")
+
+	cfg := &config.Config{
+		Project: "node",
+		Version: config.VersionConfig{Scheme: "semver"},
+		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Publish: config.PublishConfig{
+			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},
+		},
+	}
+
+	// cli should have no releasable changes.
+	result, err := Run(Options{
+		Dir:    dir,
+		Config: cfg,
+		Package: &PackageContext{
+			Name:      "cli",
+			Path:      "cli",
+			TagPrefix: "cli",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil result for cli — commit was in lib/, not cli/")
+	}
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }

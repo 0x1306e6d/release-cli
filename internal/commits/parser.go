@@ -48,6 +48,7 @@ type RawCommit struct {
 	Body    string
 }
 
+
 // ResolveConvention returns the Convention implementation for the given
 // convention name and optional custom type-to-bump mappings.
 func ResolveConvention(convention string, major, minor, patch []string) Convention {
