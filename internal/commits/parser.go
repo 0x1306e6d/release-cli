@@ -6,6 +6,7 @@ import (
 
 // ParsedCommit holds the result of parsing a single commit message.
 type ParsedCommit struct {
+	Hash     string // full commit hash, carried from RawCommit
 	Type     string // e.g., "feat", "fix"
 	Scope    string // e.g., "auth", "cli"
 	Subject  string // the description after type(scope):
@@ -30,6 +31,7 @@ func Analyze(commits []RawCommit, conv Convention) ([]ParsedCommit, *version.Bum
 		if p == nil {
 			continue
 		}
+		p.Hash = c.Hash
 		parsed = append(parsed, *p)
 
 		if highestBump == nil || p.Bump > *highestBump {

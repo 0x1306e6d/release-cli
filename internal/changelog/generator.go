@@ -10,30 +10,60 @@ import (
 	"github.com/0x1306e6d/release-cli/internal/commits"
 )
 
+// Item represents a single changelog line item with structured metadata.
+type Item struct {
+	Hash       string   // abbreviated commit hash (first 7 chars)
+	Title      string   // commit subject (after convention parsing)
+	References []string // PR numbers and issue refs, e.g., ["#42", "#15"]
+}
+
 // Entry holds the data for a single changelog entry.
 type Entry struct {
 	Version string
 	Date    string
-	Groups  map[string][]string // type label → list of descriptions
-	Grouped bool                // when true, render with ### group headings
+	Groups  map[string][]Item // type label → list of items
+	Grouped bool              // when true, render with ### group headings
 }
 
 // Generate creates a changelog entry from parsed commits.
-func Generate(version string, parsed []commits.ParsedCommit) Entry {
-	groups := make(map[string][]string)
+// refs maps full commit hashes to their resolved references (PR numbers, issue refs).
+// When refs is nil, no references are attached to items.
+func Generate(version string, parsed []commits.ParsedCommit, refs map[string][]string) Entry {
+	groups := make(map[string][]Item)
 	for _, c := range parsed {
 		label := typeLabel(c.Type, c.Breaking)
-		desc := c.Subject
+		title := c.Subject
 		if c.Scope != "" {
-			desc = fmt.Sprintf("**%s:** %s", c.Scope, desc)
+			title = fmt.Sprintf("**%s:** %s", c.Scope, title)
 		}
-		groups[label] = append(groups[label], desc)
+		hash := c.Hash
+		if len(hash) > 7 {
+			hash = hash[:7]
+		}
+		var itemRefs []string
+		if refs != nil {
+			itemRefs = refs[c.Hash]
+		}
+		groups[label] = append(groups[label], Item{
+			Hash:       hash,
+			Title:      title,
+			References: itemRefs,
+		})
 	}
 	return Entry{
 		Version: version,
 		Date:    time.Now().Format("2006-01-02"),
 		Groups:  groups,
 	}
+}
+
+// String formats the item as "<hash> - <title> (<refs>)".
+func (item Item) String() string {
+	s := item.Hash + " - " + item.Title
+	if len(item.References) > 0 {
+		s += " (" + strings.Join(item.References, ", ") + ")"
+	}
+	return s
 }
 
 // Render formats the entry using the default template (with version heading).
@@ -44,16 +74,18 @@ func (e Entry) Render() string {
 // RenderBody formats the entry content without the version heading line.
 func (e Entry) RenderBody() string {
 	var b strings.Builder
+	wroteGroup := false
 
-	writeGroup := func(label string, items []string) {
+	writeGroup := func(label string, items []Item) {
 		if e.Grouped {
 			fmt.Fprintf(&b, "\n### %s\n\n", label)
-		} else if b.Len() > 0 && !strings.HasSuffix(b.String(), "\n\n") {
+		} else if wroteGroup {
 			b.WriteString("\n")
 		}
 		for _, item := range items {
-			fmt.Fprintf(&b, "- %s\n", item)
+			fmt.Fprintf(&b, "- %s\n", item.String())
 		}
+		wroteGroup = true
 	}
 
 	// Render groups in a fixed order.

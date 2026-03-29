@@ -10,6 +10,7 @@ import (
 	"github.com/0x1306e6d/release-cli/internal/config"
 	"github.com/0x1306e6d/release-cli/internal/detector"
 	"github.com/0x1306e6d/release-cli/internal/git"
+	gh "github.com/0x1306e6d/release-cli/internal/github"
 	"github.com/0x1306e6d/release-cli/internal/propagate"
 	"github.com/0x1306e6d/release-cli/internal/publish"
 	"github.com/0x1306e6d/release-cli/internal/version"
@@ -154,7 +155,8 @@ func Run(opts Options) (*Result, error) {
 	var changelogContent string
 	var releaseBody string
 	if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
-		entry := changelog.Generate(newVer.String(), parsed)
+		refs := resolveReferences(dir, parsed)
+		entry := changelog.Generate(newVer.String(), parsed, refs)
 		entry.Grouped = cfg.Changes.IsGroupedChangelog()
 		if cfg.Changelog.Template != "" {
 			changelogContent, err = changelog.RenderCustom(entry, cfg.Changelog.Template)
@@ -322,6 +324,36 @@ func runGitHubPublish(dir string, cfg *config.Config, tag, ver, changelogBody st
 
 	report("✓ Published GitHub Release")
 	return nil
+}
+
+// resolveReferences resolves PR/issue references for each commit.
+// Tries the GitHub API first (authoritative PR associations + linked issues).
+// Falls back to regex extraction from commit text when the API is unavailable.
+func resolveReferences(dir string, parsed []commits.ParsedCommit) map[string][]string {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token != "" {
+		owner, repo, err := git.RemoteOwnerRepo(dir)
+		if err != nil {
+			report("⚠ Cannot determine repository owner/name, falling back to regex references: %v", err)
+		} else {
+			client := &gh.Client{Token: token, Owner: owner, Repo: repo}
+			shas := make([]string, len(parsed))
+			for i, p := range parsed {
+				shas[i] = p.Hash
+			}
+			return client.ResolveCommitPRs(shas)
+		}
+	}
+
+	// Fallback: regex extraction from commit messages.
+	refs := make(map[string][]string)
+	for _, p := range parsed {
+		extracted := changelog.ExtractReferences(p.Subject, p.Body)
+		if len(extracted) > 0 {
+			refs[p.Hash] = extracted
+		}
+	}
+	return refs
 }
 
 func report(format string, args ...any) {

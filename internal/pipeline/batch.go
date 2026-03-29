@@ -137,7 +137,8 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 
 		var releaseBody string
 		if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
-			entry := changelog.Generate(newVer.String(), parsed)
+			refs := resolveReferences(dir, parsed)
+			entry := changelog.Generate(newVer.String(), parsed, refs)
 			entry.Grouped = cfg.Changes.IsGroupedChangelog()
 			var changelogContent string
 			if cfg.Changelog.Template != "" {
