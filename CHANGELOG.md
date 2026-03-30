@@ -1,3 +1,10 @@
+## 0.3.0 (2026-03-30)
+- 46d84cb - Revise README structure and fix inaccurate documentation
+- 2ea426a - Add doc-coauthoring, frontend-design, and skill-creator skills
+- f522a56 - Add structured changelog format with commit hash and PR references
+- dcd8538 - Add Claude rules for commit and PR conventions
+- 83145be - Add monorepo support with hierarchical multi-package releases
+
 ## 0.2.0 (2026-03-23)
 - Write README with installation, usage, configuration, and CI/CD docs
 - Remove freeform as an explicit convention, default to accept-all when omitted
