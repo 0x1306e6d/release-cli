@@ -1,3 +1,6 @@
+## 0.4.0 (2026-04-20)
+- 7dbd7d7 - Allow monorepo root to omit project as a container (#1) (#1)
+
 ## 0.3.0 (2026-03-30)
 - 46d84cb - Revise README structure and fix inaccurate documentation
 - 2ea426a - Add doc-coauthoring, frontend-design, and skill-creator skills
