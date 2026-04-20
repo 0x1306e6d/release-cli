@@ -170,7 +170,7 @@ func TestHelmDetector_ReadWriteVersion(t *testing.T) {
 		t.Errorf("version = %q, want %q", v.Raw, "0.1.0")
 	}
 
-	d.WriteVersion(dir, Version{Raw: "0.2.0"})
+	_ = d.WriteVersion(dir, Version{Raw: "0.2.0"})
 	data, _ := os.ReadFile(filepath.Join(dir, "Chart.yaml"))
 	if !strings.Contains(string(data), "version: 0.2.0") {
 		t.Errorf("expected updated version in Chart.yaml")

@@ -15,7 +15,7 @@ func initTestRepo(t *testing.T) string {
 	mustRun(t, dir, "config", "user.email", "test@test.com")
 	mustRun(t, dir, "config", "user.name", "Test")
 	// Create initial commit.
-	os.WriteFile(filepath.Join(dir, "README.md"), []byte("# test"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "README.md"), []byte("# test"), 0644)
 	mustRun(t, dir, "add", ".")
 	mustRun(t, dir, "commit", "-m", "initial commit")
 	return dir
@@ -43,7 +43,7 @@ func TestLatestSemverTag_WithTags(t *testing.T) {
 	dir := initTestRepo(t)
 	mustRun(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
-	os.WriteFile(filepath.Join(dir, "file.txt"), []byte("change"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "file.txt"), []byte("change"), 0644)
 	mustRun(t, dir, "add", ".")
 	mustRun(t, dir, "commit", "-m", "second commit")
 	mustRun(t, dir, "tag", "-a", "v1.2.0", "-m", "v1.2.0")
@@ -76,11 +76,11 @@ func TestLogBetween(t *testing.T) {
 	dir := initTestRepo(t)
 	mustRun(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0644)
 	mustRun(t, dir, "add", ".")
 	mustRun(t, dir, "commit", "-m", "feat: add feature A")
 
-	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b"), 0644)
 	mustRun(t, dir, "add", ".")
 	mustRun(t, dir, "commit", "-m", "fix: fix bug B")
 
@@ -168,7 +168,7 @@ func TestLogBetween_WithPathFilter(t *testing.T) {
 	mustRun(t, dir, "commit", "-m", "feat: add lib module")
 
 	// Create file at root.
-	os.WriteFile(filepath.Join(dir, "root.go"), []byte("package main"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "root.go"), []byte("package main"), 0644)
 	mustRun(t, dir, "add", ".")
 	mustRun(t, dir, "commit", "-m", "fix: fix root")
 
@@ -203,7 +203,7 @@ func TestLogBetween_WithPathFilter(t *testing.T) {
 func TestCreateCommit(t *testing.T) {
 	dir := initTestRepo(t)
 	path := filepath.Join(dir, "new.txt")
-	os.WriteFile(path, []byte("new file"), 0644)
+	_ = os.WriteFile(path, []byte("new file"), 0644)
 
 	err := CreateCommit(dir, "add new file", "new.txt")
 	if err != nil {
