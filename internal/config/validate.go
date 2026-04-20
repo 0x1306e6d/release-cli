@@ -14,12 +14,14 @@ var (
 func (c *Config) validate() error {
 	var errs []string
 
-	if c.Project == "" {
-		errs = append(errs, "project is required")
-	}
-
-	if len(c.Modules) > 0 && c.Name == "" {
-		errs = append(errs, `"name" is required when "modules" is declared`)
+	if len(c.Modules) == 0 {
+		// Single-project config: project is required.
+		if c.Project == "" {
+			errs = append(errs, "project is required")
+		}
+	} else if c.Project != "" && c.Name == "" {
+		// Releasable monorepo node (has project + modules): name is required as tag prefix.
+		errs = append(errs, `"name" is required when "modules" is declared with "project"`)
 	}
 
 	if !isValidEnum(c.Version.Scheme, validSchemes) {

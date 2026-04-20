@@ -257,6 +257,57 @@ func TestLoad_SingleProjectIsNotMonorepo(t *testing.T) {
 	}
 }
 
+func TestLoad_ContainerRoot(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `modules:
+  - cli
+  - workflow
+`)
+
+	cfg, warnings, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+	if cfg.Project != "" {
+		t.Errorf("project = %q, want empty", cfg.Project)
+	}
+	if !cfg.IsMonorepo() {
+		t.Error("IsMonorepo() should return true when modules are declared")
+	}
+	if !cfg.IsContainer() {
+		t.Error("IsContainer() should return true when modules declared without project")
+	}
+}
+
+func TestLoad_ContainerWithNameIsAllowed(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `name: ignored
+modules:
+  - cli
+`)
+
+	cfg, _, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.IsContainer() {
+		t.Error("IsContainer() should return true when project is omitted")
+	}
+}
+
+func TestLoad_NonContainerRequiresProject(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, "version:\n  scheme: semver\n")
+
+	_, _, err := Load(dir)
+	if err == nil {
+		t.Fatal("expected validation error for single-project config missing project")
+	}
+}
+
 func TestLoad_NameIgnoredWithoutModules(t *testing.T) {
 	dir := t.TempDir()
 	writeConfig(t, dir, "name: foo\nproject: go\n")

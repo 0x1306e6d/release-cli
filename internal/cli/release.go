@@ -102,7 +102,12 @@ func runMonorepoRelease(dir string, cfg *config.Config, bumpOverride *version.Bu
 	var targets []*monorepo.PackageNode
 	forcedSet := make(map[string]bool)
 	if allFlag {
-		targets = tree.Flatten()
+		for _, n := range tree.Flatten() {
+			if n.Config.IsContainer() {
+				continue
+			}
+			targets = append(targets, n)
+		}
 	} else {
 		seen := make(map[string]bool)
 		for _, name := range packageFlags {
@@ -111,6 +116,9 @@ func runMonorepoRelease(dir string, cfg *config.Config, bumpOverride *version.Bu
 				return err
 			}
 			for _, n := range nodes {
+				if n.Config.IsContainer() {
+					continue
+				}
 				forcedSet[n.Name] = true
 				if !seen[n.Name] {
 					seen[n.Name] = true
