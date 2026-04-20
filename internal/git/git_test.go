@@ -156,14 +156,14 @@ func TestLogBetween_WithPathFilter(t *testing.T) {
 	mustRun(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
 	// Create file in cli/ subdirectory.
-	os.MkdirAll(filepath.Join(dir, "cli"), 0755)
-	os.WriteFile(filepath.Join(dir, "cli", "main.go"), []byte("package cli"), 0644)
+	_ = os.MkdirAll(filepath.Join(dir, "cli"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "cli", "main.go"), []byte("package cli"), 0644)
 	mustRun(t, dir, "add", ".")
 	mustRun(t, dir, "commit", "-m", "feat: add cli module")
 
 	// Create file in lib/ subdirectory.
-	os.MkdirAll(filepath.Join(dir, "lib"), 0755)
-	os.WriteFile(filepath.Join(dir, "lib", "lib.go"), []byte("package lib"), 0644)
+	_ = os.MkdirAll(filepath.Join(dir, "lib"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "lib", "lib.go"), []byte("package lib"), 0644)
 	mustRun(t, dir, "add", ".")
 	mustRun(t, dir, "commit", "-m", "feat: add lib module")
 

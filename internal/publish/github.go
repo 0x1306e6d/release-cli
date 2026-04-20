@@ -83,7 +83,7 @@ func (g *GitHubPublisher) createRelease(info ReleaseInfo) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("creating GitHub release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -102,7 +102,7 @@ func (g *GitHubPublisher) uploadAsset(releaseID int, filePath string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	stat, err := file.Stat()
 	if err != nil {
@@ -125,7 +125,7 @@ func (g *GitHubPublisher) uploadAsset(releaseID int, filePath string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)

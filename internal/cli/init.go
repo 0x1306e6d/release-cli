@@ -32,7 +32,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Check if config already exists.
 	configPath := filepath.Join(dir, config.ConfigFileName)
 	if _, err := os.Stat(configPath); err == nil {
-		return fmt.Errorf("%s already exists. Edit it manually or delete it first.", config.ConfigFileName)
+		return fmt.Errorf("%s already exists; edit it manually or delete it first", config.ConfigFileName)
 	}
 
 	// Detect project type.
@@ -84,7 +84,7 @@ func detectProject(dir string, registry *detector.Registry) (string, bool) {
 
 func generateConfig(project string, snapshot bool) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("project: %s\n", project))
+	fmt.Fprintf(&b, "project: %s\n", project)
 
 	b.WriteString("\n# version:\n")
 	b.WriteString("#   scheme: semver\n")

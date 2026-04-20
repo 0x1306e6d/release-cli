@@ -35,7 +35,7 @@ func Load(dir string) (*Config, []string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil, fmt.Errorf("config file not found: %s\nRun 'release-cli init' to create one.", path)
+			return nil, nil, fmt.Errorf("config file not found: %s (run 'release-cli init' to create one)", path)
 		}
 		return nil, nil, fmt.Errorf("reading config: %w", err)
 	}

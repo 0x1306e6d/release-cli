@@ -9,7 +9,7 @@ import (
 
 func TestGoDetector_Detect(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example"), 0644)
 
 	d := &GoDetector{}
 	if !d.Detect(dir) {
@@ -22,7 +22,7 @@ func TestGoDetector_Detect(t *testing.T) {
 
 func TestNodeDetector_ReadWriteVersion(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.2.3"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.2.3"}`), 0644)
 
 	d := &NodeDetector{}
 	if !d.Detect(dir) {
@@ -50,7 +50,7 @@ func TestNodeDetector_ReadWriteVersion(t *testing.T) {
 
 func TestPythonDetector_ReadWriteVersion(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(`[project]
+	_ = os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(`[project]
 name = "myproject"
 version = "1.0.0"
 `), 0644)
@@ -64,7 +64,7 @@ version = "1.0.0"
 		t.Errorf("version = %q, want %q", v.Raw, "1.0.0")
 	}
 
-	d.WriteVersion(dir, Version{Raw: "1.1.0"})
+	_ = d.WriteVersion(dir, Version{Raw: "1.1.0"})
 	v2, _ := d.ReadVersion(dir)
 	if v2.Raw != "1.1.0" {
 		t.Errorf("version = %q, want %q", v2.Raw, "1.1.0")
@@ -73,7 +73,7 @@ version = "1.0.0"
 
 func TestRustDetector_ReadWriteVersion(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte(`[package]
+	_ = os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte(`[package]
 name = "myapp"
 version = "0.1.0"
 edition = "2021"
@@ -85,7 +85,7 @@ edition = "2021"
 		t.Errorf("version = %q, want %q", v.Raw, "0.1.0")
 	}
 
-	d.WriteVersion(dir, Version{Raw: "0.2.0"})
+	_ = d.WriteVersion(dir, Version{Raw: "0.2.0"})
 	v2, _ := d.ReadVersion(dir)
 	if v2.Raw != "0.2.0" {
 		t.Errorf("version = %q, want %q", v2.Raw, "0.2.0")
@@ -94,7 +94,7 @@ edition = "2021"
 
 func TestJavaGradleDetector_Detect(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "build.gradle"), []byte(""), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "build.gradle"), []byte(""), 0644)
 
 	d := &JavaGradleDetector{}
 	if !d.Detect(dir) {
@@ -104,7 +104,7 @@ func TestJavaGradleDetector_Detect(t *testing.T) {
 
 func TestJavaGradleDetector_ReadWriteVersion(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "gradle.properties"), []byte("version=1.0.0-SNAPSHOT\ngroup=com.example\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "gradle.properties"), []byte("version=1.0.0-SNAPSHOT\ngroup=com.example\n"), 0644)
 
 	d := &JavaGradleDetector{}
 	v, _ := d.ReadVersion(dir)
@@ -112,7 +112,7 @@ func TestJavaGradleDetector_ReadWriteVersion(t *testing.T) {
 		t.Errorf("version = %q, want %q", v.Raw, "1.0.0-SNAPSHOT")
 	}
 
-	d.WriteVersion(dir, Version{Raw: "1.0.0"})
+	_ = d.WriteVersion(dir, Version{Raw: "1.0.0"})
 	v2, _ := d.ReadVersion(dir)
 	if v2.Raw != "1.0.0" {
 		t.Errorf("version = %q, want %q", v2.Raw, "1.0.0")
@@ -128,7 +128,7 @@ func TestJavaMavenDetector_ReadWriteVersion(t *testing.T) {
   <artifactId>myapp</artifactId>
   <version>1.0.0-SNAPSHOT</version>
 </project>`
-	os.WriteFile(filepath.Join(dir, "pom.xml"), []byte(pom), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "pom.xml"), []byte(pom), 0644)
 
 	d := &JavaMavenDetector{}
 	v, _ := d.ReadVersion(dir)
@@ -136,7 +136,7 @@ func TestJavaMavenDetector_ReadWriteVersion(t *testing.T) {
 		t.Errorf("version = %q, want %q", v.Raw, "1.0.0-SNAPSHOT")
 	}
 
-	d.WriteVersion(dir, Version{Raw: "1.0.0"})
+	_ = d.WriteVersion(dir, Version{Raw: "1.0.0"})
 	v2, _ := d.ReadVersion(dir)
 	if v2.Raw != "1.0.0" {
 		t.Errorf("version = %q, want %q", v2.Raw, "1.0.0")
@@ -145,7 +145,7 @@ func TestJavaMavenDetector_ReadWriteVersion(t *testing.T) {
 
 func TestDartDetector_ReadWriteVersion(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "pubspec.yaml"), []byte("name: myapp\nversion: 1.0.0\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "pubspec.yaml"), []byte("name: myapp\nversion: 1.0.0\n"), 0644)
 
 	d := &DartDetector{}
 	v, _ := d.ReadVersion(dir)
@@ -153,7 +153,7 @@ func TestDartDetector_ReadWriteVersion(t *testing.T) {
 		t.Errorf("version = %q, want %q", v.Raw, "1.0.0")
 	}
 
-	d.WriteVersion(dir, Version{Raw: "1.1.0"})
+	_ = d.WriteVersion(dir, Version{Raw: "1.1.0"})
 	data, _ := os.ReadFile(filepath.Join(dir, "pubspec.yaml"))
 	if !strings.Contains(string(data), "version: 1.1.0") {
 		t.Errorf("expected updated version in pubspec.yaml")
@@ -162,7 +162,7 @@ func TestDartDetector_ReadWriteVersion(t *testing.T) {
 
 func TestHelmDetector_ReadWriteVersion(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "Chart.yaml"), []byte("apiVersion: v2\nname: mychart\nversion: 0.1.0\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "Chart.yaml"), []byte("apiVersion: v2\nname: mychart\nversion: 0.1.0\n"), 0644)
 
 	d := &HelmDetector{}
 	v, _ := d.ReadVersion(dir)
