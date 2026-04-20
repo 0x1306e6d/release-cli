@@ -254,6 +254,69 @@ modules:
 	}
 }
 
+func TestLoadTree_ContainerRoot(t *testing.T) {
+	dir := setupMonorepo(t, map[string]string{
+		".release.yaml": `modules:
+  - cli
+  - lib
+`,
+		"cli/.release.yaml": "project: go\n",
+		"lib/.release.yaml": "project: node\n",
+	})
+
+	root, err := LoadTree(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !root.Config.IsContainer() {
+		t.Error("root should be a container")
+	}
+	if len(root.Children) != 2 {
+		t.Fatalf("children count = %d, want 2", len(root.Children))
+	}
+	flat := root.Flatten()
+	if len(flat) != 3 {
+		t.Errorf("flatten count = %d, want 3 (container + 2 leaves)", len(flat))
+	}
+}
+
+func TestLoadTree_NestedContainer(t *testing.T) {
+	dir := setupMonorepo(t, map[string]string{
+		".release.yaml": `modules:
+  - app
+  - services
+`,
+		"app/.release.yaml": "project: node\n",
+		"services/.release.yaml": `modules:
+  - api
+  - worker
+`,
+		"services/api/.release.yaml":    "project: go\n",
+		"services/worker/.release.yaml": "project: go\n",
+	})
+
+	root, err := LoadTree(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !root.Config.IsContainer() {
+		t.Error("root should be a container")
+	}
+	services := root.Find("services")
+	if services == nil {
+		t.Fatal("services node not found")
+	}
+	if !services.Config.IsContainer() {
+		t.Error("services should be a container")
+	}
+	flat := root.Flatten()
+	if len(flat) != 5 {
+		t.Errorf("flatten count = %d, want 5 (root + app + services + api + worker)", len(flat))
+	}
+}
+
 func TestValidateTree_OverlappingSiblings(t *testing.T) {
 	dir := setupMonorepo(t, map[string]string{
 		".release.yaml": `name: root

@@ -101,7 +101,7 @@ Executes the full release pipeline: bump version, generate changelog, commit, ta
 
 ## Configuration
 
-release-cli is configured via `.release.yaml` in the project root. Only the `project` field is required.
+release-cli is configured via `.release.yaml` in the project root. Only the `project` field is required (optional for monorepo container roots; see Monorepo section).
 
 ### Minimal Example
 
@@ -242,12 +242,22 @@ modules:
 project: go
 ```
 
+If the root (or any intermediate node) is just a collection of sub-projects and not itself a releasable unit, omit `project` to make it a container:
+
+```yaml
+# .release.yaml (container root)
+modules:
+  - cli
+  - workflow
+```
+
 Key rules:
 
-- `name` is required when `modules` is declared -- it becomes the git tag prefix (e.g., `my-project/v1.2.0`)
+- `name` is required when `modules` and `project` are both declared -- it becomes the git tag prefix (e.g., `my-project/v1.2.0`)
+- A config with `modules` but no `project` is a container: it groups sub-projects but is never released or tagged itself
 - Child packages use their relative path as the tag prefix (e.g., `cli/v1.0.0`, `workflow/sub/v0.3.0`)
 - Each `.release.yaml` is fully independent -- no config inheritance between parent and child
-- Selecting a parent for release cascades to all its descendants
+- Selecting a parent for release cascades to all its descendants (containers are skipped)
 
 ### Releasing
 

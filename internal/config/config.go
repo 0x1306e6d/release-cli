@@ -19,6 +19,12 @@ func (c *Config) IsMonorepo() bool {
 	return len(c.Modules) > 0
 }
 
+// IsContainer returns true when the config groups sub-projects without being
+// a releasable unit itself (modules declared, project omitted).
+func (c *Config) IsContainer() bool {
+	return len(c.Modules) > 0 && c.Project == ""
+}
+
 // VersionConfig configures version management.
 type VersionConfig struct {
 	Scheme   string `yaml:"scheme"`

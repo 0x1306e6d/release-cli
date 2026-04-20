@@ -116,6 +116,9 @@ func runMonorepoStatus(dir string) error {
 		if node == nil {
 			return fmt.Errorf("package %q not found in config", statusPackageFlag)
 		}
+		if node.Config.IsContainer() {
+			return fmt.Errorf("package %q is a container (no project declared); target one of its child packages or omit --package to see all", statusPackageFlag)
+		}
 
 		detectDir := dir
 		if node.Path != "" {
@@ -133,6 +136,10 @@ func runMonorepoStatus(dir string) error {
 	fmt.Fprintln(w, "PACKAGE\tVERSION\tPENDING\tNEXT BUMP")
 
 	for _, node := range allNodes {
+		if node.Config.IsContainer() {
+			continue
+		}
+
 		detectDir := dir
 		if node.Path != "" {
 			detectDir = filepath.Join(dir, node.Path)
