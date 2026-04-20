@@ -12,7 +12,7 @@ import (
 func TestPropagatePattern(t *testing.T) {
 	dir := t.TempDir()
 	file := "version.go"
-	os.WriteFile(filepath.Join(dir, file), []byte(`package version
+	_ = os.WriteFile(filepath.Join(dir, file), []byte(`package version
 
 const Version = "1.3.0"
 `), 0644)
@@ -34,7 +34,7 @@ const Version = "1.3.0"
 func TestPropagateDockerLabel(t *testing.T) {
 	dir := t.TempDir()
 	file := "Dockerfile"
-	os.WriteFile(filepath.Join(dir, file), []byte(`FROM alpine:3.18
+	_ = os.WriteFile(filepath.Join(dir, file), []byte(`FROM alpine:3.18
 LABEL version="1.3.0"
 CMD ["./app"]
 `), 0644)
@@ -56,7 +56,7 @@ CMD ["./app"]
 func TestPropagateStructuredYAML(t *testing.T) {
 	dir := t.TempDir()
 	file := "Chart.yaml"
-	os.WriteFile(filepath.Join(dir, file), []byte("apiVersion: v2\nappVersion: 1.3.0\nname: mychart\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, file), []byte("apiVersion: v2\nappVersion: 1.3.0\nname: mychart\n"), 0644)
 
 	targets := []config.PropagateTarget{
 		{File: file, Field: "appVersion"},
@@ -75,7 +75,7 @@ func TestPropagateStructuredYAML(t *testing.T) {
 func TestPropagateStructuredJSON(t *testing.T) {
 	dir := t.TempDir()
 	file := "config.json"
-	os.WriteFile(filepath.Join(dir, file), []byte(`{"version": "1.3.0", "name": "app"}`+"\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, file), []byte(`{"version": "1.3.0", "name": "app"}`+"\n"), 0644)
 
 	targets := []config.PropagateTarget{
 		{File: file, Field: "version"},
@@ -94,7 +94,7 @@ func TestPropagateStructuredJSON(t *testing.T) {
 func TestPropagatePatternNotFound(t *testing.T) {
 	dir := t.TempDir()
 	file := "version.go"
-	os.WriteFile(filepath.Join(dir, file), []byte("package main\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, file), []byte("package main\n"), 0644)
 
 	targets := []config.PropagateTarget{
 		{File: file, Pattern: `const Version = "{{.Version}}"`},

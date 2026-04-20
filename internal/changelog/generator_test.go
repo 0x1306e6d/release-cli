@@ -205,7 +205,7 @@ func TestWriteFile_NewFile(t *testing.T) {
 func TestWriteFile_Prepend(t *testing.T) {
 	dir := t.TempDir()
 	existing := "# Changelog\n\n## 1.0.0\n\n- initial release\n"
-	os.WriteFile(filepath.Join(dir, "CHANGELOG.md"), []byte(existing), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "CHANGELOG.md"), []byte(existing), 0644)
 
 	newEntry := "## 1.1.0\n\n- new feature\n"
 	err := WriteFile(dir, "CHANGELOG.md", newEntry)

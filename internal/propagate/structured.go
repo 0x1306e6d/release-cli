@@ -38,7 +38,7 @@ func updateYAMLField(path, field, value string) error {
 		return fmt.Errorf("parsing YAML: %w", err)
 	}
 
-	if doc.Content == nil || len(doc.Content) == 0 {
+	if len(doc.Content) == 0 {
 		return fmt.Errorf("empty YAML document")
 	}
 

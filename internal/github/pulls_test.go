@@ -9,7 +9,7 @@ import (
 
 func TestLookupCommitPRs_WithPR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]pullResponse{
+		_ = json.NewEncoder(w).Encode([]pullResponse{
 			{Number: 42, Body: "Implements feature X"},
 		})
 	}))
@@ -27,7 +27,7 @@ func TestLookupCommitPRs_WithPR(t *testing.T) {
 
 func TestLookupCommitPRs_NoPR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]pullResponse{})
+		_ = json.NewEncoder(w).Encode([]pullResponse{})
 	}))
 	defer srv.Close()
 
@@ -43,7 +43,7 @@ func TestLookupCommitPRs_NoPR(t *testing.T) {
 
 func TestLookupCommitPRs_WithLinkedIssues(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]pullResponse{
+		_ = json.NewEncoder(w).Encode([]pullResponse{
 			{Number: 42, Body: "Closes #15\nFixes #7"},
 		})
 	}))
@@ -68,7 +68,7 @@ func TestLookupCommitPRs_WithLinkedIssues(t *testing.T) {
 func TestLookupCommitPRs_APIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal error"))
+		_, _ = w.Write([]byte("internal error"))
 	}))
 	defer srv.Close()
 
@@ -85,7 +85,7 @@ func TestResolveCommitPRs_BatchWithErrors(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		json.NewEncoder(w).Encode([]pullResponse{
+		_ = json.NewEncoder(w).Encode([]pullResponse{
 			{Number: 10, Body: ""},
 		})
 	}))

@@ -83,7 +83,7 @@ modules:
 `,
 	})
 	// Create the directory but no .release.yaml
-	os.MkdirAll(filepath.Join(dir, "missing"), 0755)
+	_ = os.MkdirAll(filepath.Join(dir, "missing"), 0755)
 
 	_, err := LoadTree(dir)
 	if err == nil {

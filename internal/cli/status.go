@@ -133,7 +133,7 @@ func runMonorepoStatus(dir string) error {
 	registry := detector.DefaultRegistry()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "PACKAGE\tVERSION\tPENDING\tNEXT BUMP")
+	_, _ = fmt.Fprintln(w, "PACKAGE\tVERSION\tPENDING\tNEXT BUMP")
 
 	for _, node := range allNodes {
 		if node.Config.IsContainer() {
@@ -147,7 +147,7 @@ func runMonorepoStatus(dir string) error {
 
 		det, err := registry.Resolve(node.Config.Project, detectDir)
 		if err != nil {
-			fmt.Fprintf(w, "%s\t(error)\t-\t-\n", node.Name)
+			_, _ = fmt.Fprintf(w, "%s\t(error)\t-\t-\n", node.Name)
 			continue
 		}
 
@@ -178,7 +178,7 @@ func runMonorepoStatus(dir string) error {
 			bumpStr = bumpType.String()
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", node.Name, currentVer.String(), len(gitCommits), bumpStr)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", node.Name, currentVer.String(), len(gitCommits), bumpStr)
 	}
 
 	return w.Flush()

@@ -40,13 +40,13 @@ func TestPipeline_FullRelease_Node(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Create a Node project.
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
 	// Add feature commit.
-	os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new feature"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new feature"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "feat: add new feature")
 
@@ -94,13 +94,13 @@ func TestPipeline_FullRelease_Node(t *testing.T) {
 func TestPipeline_NoReleasableChanges(t *testing.T) {
 	dir := initTestRepo(t)
 
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
 	// Non-conventional commit.
-	os.WriteFile(filepath.Join(dir, "readme.md"), []byte("update"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "readme.md"), []byte("update"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "update docs")
 
@@ -126,12 +126,12 @@ func TestPipeline_NoReleasableChanges(t *testing.T) {
 func TestPipeline_DryRun(t *testing.T) {
 	dir := initTestRepo(t)
 
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
-	os.WriteFile(filepath.Join(dir, "feat.js"), []byte("//"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "feat.js"), []byte("//"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "feat: new thing")
 
@@ -163,17 +163,17 @@ func TestPipeline_DryRun(t *testing.T) {
 func TestPipeline_FreeformConvention(t *testing.T) {
 	dir := initTestRepo(t)
 
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
 	// Plain English commits (not conventional).
-	os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "Add user export feature")
 
-	os.WriteFile(filepath.Join(dir, "fix.js"), []byte("// fix"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "fix.js"), []byte("// fix"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "Fix login bug")
 
@@ -215,13 +215,13 @@ func TestPipeline_FreeformConvention(t *testing.T) {
 func TestPipeline_BumpOverride(t *testing.T) {
 	dir := initTestRepo(t)
 
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
 	// Add a fix commit (normally patch).
-	os.WriteFile(filepath.Join(dir, "fix.js"), []byte("// fix"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "fix.js"), []byte("// fix"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "fix: resolve null pointer")
 
@@ -255,13 +255,13 @@ func TestPipeline_BumpOverride(t *testing.T) {
 func TestPipeline_NoCategorize_FlatChangelog(t *testing.T) {
 	dir := initTestRepo(t)
 
-	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
 
 	// Plain commits — no convention configured.
-	os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "Add user export feature")
 
@@ -304,14 +304,14 @@ func TestPipeline_MonorepoSinglePackage(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Create root with a "cli" module.
-	os.MkdirAll(filepath.Join(dir, "cli"), 0755)
-	os.WriteFile(filepath.Join(dir, "cli", "package.json"), []byte(`{"name": "cli", "version": "1.0.0"}`), 0644)
+	_ = os.MkdirAll(filepath.Join(dir, "cli"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "cli", "package.json"), []byte(`{"name": "cli", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "cli/v1.0.0", "-m", "cli v1.0.0")
 
 	// Add a feature commit touching cli/.
-	os.WriteFile(filepath.Join(dir, "cli", "feature.js"), []byte("// new"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "cli", "feature.js"), []byte("// new"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "feat: add cli feature")
 
@@ -362,14 +362,14 @@ func TestPipeline_MonorepoForcedRelease(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Create root with a "lib" module.
-	os.MkdirAll(filepath.Join(dir, "lib"), 0755)
-	os.WriteFile(filepath.Join(dir, "lib", "package.json"), []byte(`{"name": "lib", "version": "1.0.0"}`), 0644)
+	_ = os.MkdirAll(filepath.Join(dir, "lib"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "lib", "package.json"), []byte(`{"name": "lib", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "lib/v1.0.0", "-m", "lib v1.0.0")
 
 	// Add a commit that does NOT touch lib/ — only root.
-	os.WriteFile(filepath.Join(dir, "root.txt"), []byte("root change"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "root.txt"), []byte("root change"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "feat: root change")
 
@@ -433,17 +433,17 @@ func TestPipeline_PathFilterExcludesOtherPackages(t *testing.T) {
 	dir := initTestRepo(t)
 
 	// Create two modules: cli and lib.
-	os.MkdirAll(filepath.Join(dir, "cli"), 0755)
-	os.MkdirAll(filepath.Join(dir, "lib"), 0755)
-	os.WriteFile(filepath.Join(dir, "cli", "package.json"), []byte(`{"name": "cli", "version": "1.0.0"}`), 0644)
-	os.WriteFile(filepath.Join(dir, "lib", "package.json"), []byte(`{"name": "lib", "version": "1.0.0"}`), 0644)
+	_ = os.MkdirAll(filepath.Join(dir, "cli"), 0755)
+	_ = os.MkdirAll(filepath.Join(dir, "lib"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "cli", "package.json"), []byte(`{"name": "cli", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "lib", "package.json"), []byte(`{"name": "lib", "version": "1.0.0"}`), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "initial commit")
 	mustGit(t, dir, "tag", "-a", "cli/v1.0.0", "-m", "cli v1.0.0")
 	mustGit(t, dir, "tag", "-a", "lib/v1.0.0", "-m", "lib v1.0.0")
 
 	// Add commit only in lib/.
-	os.WriteFile(filepath.Join(dir, "lib", "feature.js"), []byte("// lib feature"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "lib", "feature.js"), []byte("// lib feature"), 0644)
 	mustGit(t, dir, "add", ".")
 	mustGit(t, dir, "commit", "-m", "feat: lib feature")
 

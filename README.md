@@ -280,6 +280,8 @@ Commit analysis is path-scoped: only commits touching files under a package's di
 
 ## CI/CD
 
+Pull requests against `main` and pushes to `main` are validated by `.github/workflows/ci.yml`, which runs `make vet`, `make test`, `make build`, `golangci-lint`, and a `go mod tidy` drift check.
+
 ### GitHub Actions
 
 ```yaml
