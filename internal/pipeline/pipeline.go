@@ -75,9 +75,9 @@ func Run(opts Options) (*Result, error) {
 	report("Current version: %s", prevVer.String())
 
 	// 3. Analyze commits.
-	fromTag := ""
-	if !prevVer.IsZero() {
-		fromTag = git.NamespacedTagString(tagPrefix, prevVer.StripPreRelease())
+	baseVer, fromTag, err := resolveReleaseBase(dir, prevVer, tagPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("resolving release base: %w", err)
 	}
 
 	gitCommits, err := git.LogBetween(dir, fromTag, "HEAD", pathFilter)
@@ -113,12 +113,11 @@ func Run(opts Options) (*Result, error) {
 	report("Bump type: %s (%d releasable commits)", bumpType.String(), len(parsed))
 
 	// 4. Calculate new version.
-	baseVer := prevVer.StripPreRelease()
 	newVer := baseVer.Bump(*bumpType)
-	report("Version bump: %s → %s", prevVer.CoreString(), newVer.String())
+	report("Version bump: %s → %s", baseVer.CoreString(), newVer.String())
 
 	if opts.DryRun {
-		return dryRunReport(cfg, det, prevVer, newVer, parsed, tagPrefix), nil
+		return dryRunReport(cfg, det, baseVer, newVer, parsed, tagPrefix), nil
 	}
 
 	// Build hook options for monorepo package context.
@@ -128,7 +127,7 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 5. Pre-bump hook.
-	if err := RunHook(dir, cfg.Hooks.PreBump, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PreBump, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
@@ -136,7 +135,7 @@ func Run(opts Options) (*Result, error) {
 	if err := det.WriteVersion(detectDir, detector.Version{Raw: newVer.String()}); err != nil {
 		return nil, fmt.Errorf("writing version: %w", err)
 	}
-	report("✓ Bumped version: %s → %s", prevVer.CoreString(), newVer.String())
+	report("✓ Bumped version: %s → %s", baseVer.CoreString(), newVer.String())
 
 	// 7. Propagate.
 	if len(cfg.Propagate) > 0 {
@@ -147,7 +146,7 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 8. Post-bump hook.
-	if err := RunHook(dir, cfg.Hooks.PostBump, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PostBump, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
@@ -201,7 +200,7 @@ func Run(opts Options) (*Result, error) {
 	report("✓ Pushed commit and tag to remote")
 
 	// 12. Pre-publish hook.
-	if err := RunHook(dir, cfg.Hooks.PrePublish, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PrePublish, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
@@ -211,7 +210,7 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 14. Post-publish hook.
-	if err := RunHook(dir, cfg.Hooks.PostPublish, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts...); err != nil {
+	if err := RunHook(dir, cfg.Hooks.PostPublish, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts...); err != nil {
 		return nil, err
 	}
 
@@ -239,10 +238,29 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	return &Result{
-		PrevVersion: prevVer.CoreString(),
+		PrevVersion: baseVer.CoreString(),
 		NewVersion:  newVer.String(),
 		TagName:     tag,
 	}, nil
+}
+
+func resolveReleaseBase(dir string, manifestVer version.Semver, tagPrefix string) (version.Semver, string, error) {
+	if manifestVer.IsPreRelease() {
+		baseVer, err := git.LatestSemverTag(dir, tagPrefix)
+		if err != nil {
+			return version.Semver{}, "", err
+		}
+		if baseVer.IsZero() {
+			return baseVer, "", nil
+		}
+		return baseVer, git.NamespacedTagString(tagPrefix, baseVer), nil
+	}
+
+	baseVer := manifestVer.StripPreRelease()
+	if baseVer.IsZero() {
+		return baseVer, "", nil
+	}
+	return baseVer, git.NamespacedTagString(tagPrefix, baseVer), nil
 }
 
 func readCurrentVersion(dir string, det detector.Detector, detectDir, tagPrefix string) (version.Semver, error) {
