@@ -1,3 +1,7 @@
+## 0.5.0 (2026-05-06)
+- 6aaea86 - Fix prerelease release base selection (#5) (#5)
+- d68901d - Add PR-triggered CI workflow (#2) (#2)
+
 ## 0.4.0 (2026-04-20)
 - 7dbd7d7 - Allow monorepo root to omit project as a container (#1) (#1)
 
