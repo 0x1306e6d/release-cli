@@ -160,6 +160,48 @@ func TestPipeline_DryRun(t *testing.T) {
 	}
 }
 
+func TestPipeline_PreReleaseManifestUsesLatestExistingTag(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.2.0-dev"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.1.0", "-m", "v1.1.0")
+
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add feature")
+
+	cfg := &config.Config{
+		Project: "node",
+		Version: config.VersionConfig{Scheme: "semver"},
+		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{
+			Enabled: boolPtr(false),
+		},
+		Publish: config.PublishConfig{
+			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},
+		},
+	}
+
+	result, err := Run(Options{Dir: dir, Config: cfg, DryRun: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result in dry-run")
+	}
+	if result.PrevVersion != "1.1.0" {
+		t.Errorf("previous version = %q, want %q", result.PrevVersion, "1.1.0")
+	}
+	if result.NewVersion != "1.2.0" {
+		t.Errorf("new version = %q, want %q", result.NewVersion, "1.2.0")
+	}
+	if result.TagName != "v1.2.0" {
+		t.Errorf("tag = %q, want %q", result.TagName, "v1.2.0")
+	}
+}
+
 func TestPipeline_FreeformConvention(t *testing.T) {
 	dir := initTestRepo(t)
 
@@ -358,6 +400,109 @@ func TestPipeline_MonorepoSinglePackage(t *testing.T) {
 	}
 }
 
+func TestPipeline_PackageSnapshotUsesLatestExistingPackageTag(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.MkdirAll(filepath.Join(dir, "package"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "package", "build.gradle"), []byte("plugins { id 'java' }\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "package", "gradle.properties"), []byte("version=1.2.1-SNAPSHOT\ngroup=com.example\n"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "package/v1.2.0", "-m", "package v1.2.0")
+
+	_ = os.MkdirAll(filepath.Join(dir, "package", "src"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "package", "src", "Main.java"), []byte("class Main {}\n"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "fix: update package")
+
+	cfg := &config.Config{
+		Project: "java-gradle",
+		Version: config.VersionConfig{Scheme: "semver", Snapshot: true},
+		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{
+			Enabled: boolPtr(false),
+		},
+		Publish: config.PublishConfig{
+			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},
+		},
+	}
+
+	result, err := Run(Options{
+		Dir:    dir,
+		Config: cfg,
+		DryRun: true,
+		Package: &PackageContext{
+			Name:      "package",
+			Path:      "package",
+			TagPrefix: "package",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result in dry-run")
+	}
+	if result.PrevVersion != "1.2.0" {
+		t.Errorf("previous version = %q, want %q", result.PrevVersion, "1.2.0")
+	}
+	if result.NewVersion != "1.2.1" {
+		t.Errorf("new version = %q, want %q", result.NewVersion, "1.2.1")
+	}
+	if result.TagName != "package/v1.2.1" {
+		t.Errorf("tag = %q, want %q", result.TagName, "package/v1.2.1")
+	}
+}
+
+func TestBatchRelease_PreReleaseManifestUsesLatestPackageTag(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.MkdirAll(filepath.Join(dir, "cli"), 0755)
+	_ = os.WriteFile(filepath.Join(dir, "cli", "package.json"), []byte(`{"name": "cli", "version": "1.2.0-dev"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "cli/v1.1.0", "-m", "cli v1.1.0")
+
+	_ = os.WriteFile(filepath.Join(dir, "cli", "feature.js"), []byte("// feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add cli feature")
+
+	cfg := &config.Config{
+		Project: "node",
+		Version: config.VersionConfig{Scheme: "semver"},
+		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{
+			Enabled: boolPtr(false),
+		},
+		Publish: config.PublishConfig{
+			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},
+		},
+	}
+
+	results, err := BatchRelease(
+		dir,
+		[]*PackageContext{{Name: "cli", Path: "cli", TagPrefix: "cli"}},
+		[]*config.Config{cfg},
+		true,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("result count = %d, want 1", len(results))
+	}
+	if results[0].PrevVersion != "1.1.0" {
+		t.Errorf("previous version = %q, want %q", results[0].PrevVersion, "1.1.0")
+	}
+	if results[0].NewVersion != "1.2.0" {
+		t.Errorf("new version = %q, want %q", results[0].NewVersion, "1.2.0")
+	}
+	if results[0].TagName != "cli/v1.2.0" {
+		t.Errorf("tag = %q, want %q", results[0].TagName, "cli/v1.2.0")
+	}
+}
+
 func TestPipeline_MonorepoForcedRelease(t *testing.T) {
 	dir := initTestRepo(t)
 
@@ -448,9 +593,9 @@ func TestPipeline_PathFilterExcludesOtherPackages(t *testing.T) {
 	mustGit(t, dir, "commit", "-m", "feat: lib feature")
 
 	cfg := &config.Config{
-		Project: "node",
-		Version: config.VersionConfig{Scheme: "semver"},
-		Changes: config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
 		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
 		Publish: config.PublishConfig{
 			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},

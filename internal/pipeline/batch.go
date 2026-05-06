@@ -59,9 +59,9 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		}
 		report("[%s] Current version: %s", pkg.Name, prevVer.String())
 
-		fromTag := ""
-		if !prevVer.IsZero() {
-			fromTag = git.NamespacedTagString(pkg.TagPrefix, prevVer.StripPreRelease())
+		baseVer, fromTag, err := resolveReleaseBase(dir, prevVer, pkg.TagPrefix)
+		if err != nil {
+			return nil, fmt.Errorf("package %q: resolving release base: %w", pkg.Name, err)
 		}
 
 		gitCommits, err := git.LogBetween(dir, fromTag, "HEAD", pkg.Path)
@@ -93,17 +93,16 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		}
 
 		// Calculate new version.
-		baseVer := prevVer.StripPreRelease()
 		newVer := baseVer.Bump(*bt)
-		report("[%s] Version bump: %s → %s", pkg.Name, prevVer.CoreString(), newVer.String())
+		report("[%s] Version bump: %s → %s", pkg.Name, baseVer.CoreString(), newVer.String())
 
 		if dryRun {
 			tag := git.NamespacedTagString(pkg.TagPrefix, newVer)
-			report("[%s] [dry-run] Would bump: %s → %s, tag: %s", pkg.Name, prevVer.CoreString(), newVer.String(), tag)
+			report("[%s] [dry-run] Would bump: %s → %s, tag: %s", pkg.Name, baseVer.CoreString(), newVer.String(), tag)
 			results = append(results, &PackageResult{
 				Package:     pkg,
 				Config:      cfg,
-				PrevVersion: prevVer,
+				PrevVersion: baseVer,
 				NewVersion:  newVer,
 				TagName:     tag,
 			})
@@ -113,14 +112,14 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		hookOpts := HookOptions{PackageName: pkg.Name, PackagePath: pkg.Path}
 
 		// Pre-bump hook.
-		if err := RunHook(dir, cfg.Hooks.PreBump, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts); err != nil {
+		if err := RunHook(dir, cfg.Hooks.PreBump, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts); err != nil {
 			return nil, fmt.Errorf("package %q: %w", pkg.Name, err)
 		}
 
 		if err := det.WriteVersion(detectDir, detector.Version{Raw: newVer.String()}); err != nil {
 			return nil, fmt.Errorf("package %q: writing version: %w", pkg.Name, err)
 		}
-		report("[%s] ✓ Bumped version: %s → %s", pkg.Name, prevVer.CoreString(), newVer.String())
+		report("[%s] ✓ Bumped version: %s → %s", pkg.Name, baseVer.CoreString(), newVer.String())
 
 		// Propagate.
 		if len(cfg.Propagate) > 0 {
@@ -131,7 +130,7 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		}
 
 		// Post-bump hook.
-		if err := RunHook(dir, cfg.Hooks.PostBump, newVer.String(), prevVer.CoreString(), cfg.Project, hookOpts); err != nil {
+		if err := RunHook(dir, cfg.Hooks.PostBump, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts); err != nil {
 			return nil, fmt.Errorf("package %q: %w", pkg.Name, err)
 		}
 
@@ -163,7 +162,7 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 			Config:      cfg,
 			Detector:    det,
 			DetectDir:   detectDir,
-			PrevVersion: prevVer,
+			PrevVersion: baseVer,
 			NewVersion:  newVer,
 			TagName:     tag,
 			Parsed:      parsed,
