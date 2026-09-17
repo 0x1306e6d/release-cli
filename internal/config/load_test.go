@@ -51,6 +51,9 @@ changes:
 changelog:
   enabled: false
   file: HISTORY.md
+commit:
+  release: "release {{ .ReleaseVersion }}"
+  next: "next {{ .NextVersion }}"
 propagate:
   - file: Dockerfile
     type: docker-label
@@ -87,6 +90,9 @@ publish:
 	}
 	if cfg.Changelog.File != "HISTORY.md" {
 		t.Errorf("changelog.file = %q, want %q", cfg.Changelog.File, "HISTORY.md")
+	}
+	if cfg.Commit.Release != "release {{ .ReleaseVersion }}" || cfg.Commit.Next != "next {{ .NextVersion }}" {
+		t.Errorf("commit templates = %#v, want configured values", cfg.Commit)
 	}
 	if len(cfg.Propagate) != 1 {
 		t.Fatalf("propagate count = %d, want 1", len(cfg.Propagate))

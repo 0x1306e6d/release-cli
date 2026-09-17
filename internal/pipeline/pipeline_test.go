@@ -365,6 +365,7 @@ func TestPipeline_MonorepoSinglePackage(t *testing.T) {
 			Enabled: boolPtr(true),
 			File:    "CHANGELOG.md",
 		},
+		Commit: config.CommitConfig{Release: "Release {{ .Package }} {{ .ReleaseVersion }}"},
 		Publish: config.PublishConfig{
 			GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)},
 		},
@@ -397,6 +398,15 @@ func TestPipeline_MonorepoSinglePackage(t *testing.T) {
 	changelog, _ := os.ReadFile(filepath.Join(dir, "cli", "CHANGELOG.md"))
 	if !strings.Contains(string(changelog), "1.1.0") {
 		t.Errorf("cli/CHANGELOG.md not created: %s", changelog)
+	}
+	cmd := exec.Command("git", "log", "-1", "--format=%s")
+	cmd.Dir = dir
+	message, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("reading release commit message: %v", err)
+	}
+	if got := strings.TrimSpace(string(message)); got != "Release cli 1.1.0" {
+		t.Errorf("commit message = %q, want %q", got, "Release cli 1.1.0")
 	}
 }
 
@@ -617,6 +627,81 @@ func TestPipeline_PathFilterExcludesOtherPackages(t *testing.T) {
 	}
 	if result != nil {
 		t.Error("expected nil result for cli — commit was in lib/, not cli/")
+	}
+}
+
+func TestPipeline_CommitMessageTemplates(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "build.gradle"), []byte("plugins { id 'java' }\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "gradle.properties"), []byte("version=1.0.0-SNAPSHOT\n"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v0.9.0", "-m", "v0.9.0")
+
+	_ = os.WriteFile(filepath.Join(dir, "feature.java"), []byte("class Feature {}\n"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add feature")
+
+	cfg := &config.Config{
+		Project:   "java-gradle",
+		Version:   config.VersionConfig{Scheme: "semver", Snapshot: true},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Commit: config.CommitConfig{
+			Release: "Release {{ .Project }} {{ .ReleaseVersion }} -> {{ .NextVersion }}",
+			Next:    "Next {{ .ReleaseVersion }} -> {{ .NextVersion }}",
+		},
+		Publish: config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	if _, err := Run(Options{Dir: dir, Config: cfg}); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+
+	cmd := exec.Command("git", "log", "--format=%s", "-2")
+	cmd.Dir = dir
+	log, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("reading commit messages: %v", err)
+	}
+	if got, want := string(log), "Next 0.10.0 -> 0.11.0-SNAPSHOT\nRelease java-gradle 0.10.0 -> 0.11.0-SNAPSHOT\n"; got != want {
+		t.Errorf("commit messages = %q, want %q", got, want)
+	}
+}
+
+func TestPipeline_InvalidCommitMessageTemplateDoesNotCommit(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test","version":"1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add feature")
+
+	cfg := &config.Config{
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Commit:    config.CommitConfig{Release: "{{ .Missing }}"},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	if _, err := Run(Options{Dir: dir, Config: cfg}); err == nil {
+		t.Fatal("expected invalid template error")
+	}
+
+	cmd := exec.Command("git", "rev-list", "--count", "HEAD")
+	cmd.Dir = dir
+	count, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("counting commits: %v", err)
+	}
+	if got := strings.TrimSpace(string(count)); got != "2" {
+		t.Errorf("commit count = %s, want 2", got)
 	}
 }
 

@@ -140,6 +140,10 @@ changelog:
     ## {{ .Version }} ({{ .Date }})
     {{ range .Groups }}...
 
+commit:
+  release: "Release {{ .ReleaseVersion }}" # Optional Go template
+  next: "Prepare next development iteration" # Optional Go template
+
 propagate: # Propagate version to other files
   - file: Dockerfile
     type: docker-label # Built-in type
@@ -163,6 +167,9 @@ publish:
 ```
 
 Environment variables can be referenced with `${VAR_NAME}` syntax in string values.
+
+Commit message templates receive `.ReleaseVersion`, `.NextVersion`, `.Project`, and `.Package`.
+Omit either message to retain the default release-cli wording.
 
 ### Behavior Without `changes.commits`
 

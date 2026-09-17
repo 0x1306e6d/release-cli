@@ -116,6 +116,36 @@ func Run(opts Options) (*Result, error) {
 	newVer := baseVer.Bump(*bumpType)
 	report("Version bump: %s → %s", baseVer.CoreString(), newVer.String())
 
+	packageName := ""
+	if pkg != nil {
+		packageName = pkg.Name
+	}
+	projectName := cfg.Name
+	if projectName == "" {
+		projectName = cfg.Project
+	}
+	nextVer := ""
+	if cfg.Version.Snapshot && det.SnapshotSuffix() != "" {
+		nextVer = version.NextSnapshot(newVer, version.NormalizeSnapshotSuffix(det.SnapshotSuffix())).String()
+	}
+	messageData := commitMessageData{
+		ReleaseVersion: newVer.String(),
+		NextVersion:    nextVer,
+		Project:        projectName,
+		Package:        packageName,
+	}
+	commitMsg, err := renderCommitMessage("release", cfg.Commit.Release, defaultReleaseCommitMessage(packageName, newVer.String()), messageData)
+	if err != nil {
+		return nil, err
+	}
+	var snapMsg string
+	if nextVer != "" {
+		snapMsg, err = renderCommitMessage("next", cfg.Commit.Next, defaultNextCommitMessage(packageName), messageData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if opts.DryRun {
 		return dryRunReport(cfg, det, baseVer, newVer, parsed, tagPrefix), nil
 	}
@@ -174,13 +204,6 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 10. Commit.
-	var commitLabel string
-	if pkg != nil {
-		commitLabel = pkg.Name + " " + newVer.String()
-	} else {
-		commitLabel = newVer.String()
-	}
-	commitMsg := fmt.Sprintf("Release %s", commitLabel)
 	if err := git.CreateCommit(dir, commitMsg, "."); err != nil {
 		return nil, fmt.Errorf("creating release commit: %w", err)
 	}
@@ -188,7 +211,7 @@ func Run(opts Options) (*Result, error) {
 
 	// 11. Tag.
 	tag := git.NamespacedTagString(tagPrefix, newVer)
-	if err := git.CreateTag(dir, tag, fmt.Sprintf("Release %s", commitLabel)); err != nil {
+	if err := git.CreateTag(dir, tag, fmt.Sprintf("Release %s", releaseCommitLabel(packageName, newVer.String()))); err != nil {
 		return nil, err
 	}
 	report("✓ Tagged %s", tag)
@@ -222,10 +245,6 @@ func Run(opts Options) (*Result, error) {
 		snapVer := version.NextSnapshot(newVer, version.NormalizeSnapshotSuffix(det.SnapshotSuffix()))
 		if err := det.WriteVersion(detectDir, detector.Version{Raw: snapVer.String()}); err != nil {
 			return nil, fmt.Errorf("writing snapshot version: %w", err)
-		}
-		snapMsg := "Prepare next development iteration"
-		if pkg != nil {
-			snapMsg += " for " + pkg.Name
 		}
 		if err := git.CreateCommit(dir, snapMsg, "."); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)

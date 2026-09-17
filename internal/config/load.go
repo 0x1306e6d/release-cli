@@ -20,6 +20,7 @@ var knownTopLevelKeys = map[string]bool{
 	"version":   true,
 	"changes":   true,
 	"changelog": true,
+	"commit":    true,
 	"propagate": true,
 	"hooks":     true,
 	"publish":   true,

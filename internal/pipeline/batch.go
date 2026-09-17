@@ -3,7 +3,6 @@ package pipeline
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/0x1306e6d/release-cli/internal/changelog"
 	"github.com/0x1306e6d/release-cli/internal/commits"
@@ -187,12 +186,27 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		return out, nil
 	}
 
-	// Phase 2: Batched commit.
-	var labels []string
+	var snapResults []*PackageResult
+	var snapVersions []string
 	for _, r := range results {
-		labels = append(labels, r.Package.Name+" "+r.NewVersion.String())
+		if r.Config.Version.Snapshot && r.Detector != nil && r.Detector.SnapshotSuffix() != "" {
+			snapResults = append(snapResults, r)
+			snapVersions = append(snapVersions, version.NextSnapshot(r.NewVersion, version.NormalizeSnapshotSuffix(r.Detector.SnapshotSuffix())).String())
+		}
 	}
-	commitMsg := fmt.Sprintf("Release %s", strings.Join(labels, ", "))
+
+	// Phase 2: Batched commit.
+	commitMsg, err := renderBatchCommitMessage("release", results, nil)
+	if err != nil {
+		return nil, err
+	}
+	var snapMsg string
+	if len(snapResults) > 0 {
+		snapMsg, err = renderBatchCommitMessage("next", snapResults, snapVersions)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := git.CreateCommit(dir, commitMsg, "."); err != nil {
 		return nil, fmt.Errorf("creating batched release commit: %w", err)
 	}
@@ -244,12 +258,6 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 	}
 
 	// Phase 4: Batched SNAPSHOT post-release.
-	var snapResults []*PackageResult
-	for _, r := range results {
-		if r.Config.Version.Snapshot && r.Detector != nil && r.Detector.SnapshotSuffix() != "" {
-			snapResults = append(snapResults, r)
-		}
-	}
 	if len(snapResults) > 0 {
 		for _, r := range snapResults {
 			snapVer := version.NextSnapshot(r.NewVersion, version.NormalizeSnapshotSuffix(r.Detector.SnapshotSuffix()))
@@ -258,7 +266,7 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 			}
 			report("[%s] ✓ Bumped to next development version: %s", r.Package.Name, snapVer.String())
 		}
-		if err := git.CreateCommit(dir, "Prepare next development iteration", "."); err != nil {
+		if err := git.CreateCommit(dir, snapMsg, "."); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
 		if err := git.Push(dir); err != nil {
