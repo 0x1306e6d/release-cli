@@ -27,11 +27,13 @@ type PackageContext struct {
 
 // Options holds the runtime context for a pipeline run.
 type Options struct {
-	Dir          string
-	Config       *config.Config
-	DryRun       bool
-	BumpOverride *version.BumpType
-	Package      *PackageContext // nil for single-project mode
+	Dir            string
+	Config         *config.Config
+	DryRun         bool
+	BumpOverride   *version.BumpType
+	ReleaseVersion string
+	NextVersion    string
+	Package        *PackageContext // nil for single-project mode
 }
 
 // Result holds the outcome of a pipeline run.
@@ -43,6 +45,13 @@ type Result struct {
 
 // Run executes the full release pipeline.
 func Run(opts Options) (*Result, error) {
+	if opts.ReleaseVersion != "" && opts.BumpOverride != nil {
+		return nil, fmt.Errorf("release version override cannot be used with bump override")
+	}
+	if opts.NextVersion != "" && opts.ReleaseVersion == "" {
+		return nil, fmt.Errorf("next version override requires release version override")
+	}
+
 	cfg := opts.Config
 	dir := opts.Dir
 	pkg := opts.Package
@@ -99,22 +108,33 @@ func Run(opts Options) (*Result, error) {
 		report("Bump override: %s", bumpType.String())
 	}
 
-	if bumpType == nil {
-		if pkg != nil && pkg.IsForced {
-			// Forced release in cascade mode: default to patch bump.
-			patch := version.BumpPatch
-			bumpType = &patch
-			report("No releasable changes found, forced patch bump")
-		} else {
-			report("No releasable changes found.")
-			return nil, nil
+	var newVer version.Semver
+	if opts.ReleaseVersion != "" {
+		newVer, err = resolveReleaseVersion(baseVer, opts.ReleaseVersion)
+		if err != nil {
+			return nil, err
 		}
+		report("Release version override: %s", newVer.String())
+	} else {
+		if bumpType == nil {
+			if pkg != nil && pkg.IsForced {
+				patch := version.BumpPatch
+				bumpType = &patch
+				report("No releasable changes found, forced patch bump")
+			} else {
+				report("No releasable changes found.")
+				return nil, nil
+			}
+		}
+		report("Bump type: %s (%d releasable commits)", bumpType.String(), len(parsed))
+		newVer = baseVer.Bump(*bumpType)
 	}
-	report("Bump type: %s (%d releasable commits)", bumpType.String(), len(parsed))
-
-	// 4. Calculate new version.
-	newVer := baseVer.Bump(*bumpType)
 	report("Version bump: %s → %s", baseVer.CoreString(), newVer.String())
+
+	nextVer, err := resolveNextVersion(newVer, opts.NextVersion, cfg.Version.Snapshot, det.SnapshotSuffix())
+	if err != nil {
+		return nil, err
+	}
 
 	packageName := ""
 	if pkg != nil {
@@ -123,10 +143,6 @@ func Run(opts Options) (*Result, error) {
 	projectName := cfg.Name
 	if projectName == "" {
 		projectName = cfg.Project
-	}
-	nextVer := ""
-	if cfg.Version.Snapshot && det.SnapshotSuffix() != "" {
-		nextVer = version.NextSnapshot(newVer, version.NormalizeSnapshotSuffix(det.SnapshotSuffix())).String()
 	}
 	messageData := commitMessageData{
 		ReleaseVersion: newVer.String(),
@@ -147,7 +163,7 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	if opts.DryRun {
-		return dryRunReport(cfg, det, baseVer, newVer, parsed, tagPrefix), nil
+		return dryRunReport(cfg, baseVer, newVer, nextVer, parsed, tagPrefix), nil
 	}
 
 	// Build hook options for monorepo package context.
@@ -241,15 +257,14 @@ func Run(opts Options) (*Result, error) {
 	// Notify integration will be wired here once implemented.
 
 	// 16. SNAPSHOT post-release.
-	if cfg.Version.Snapshot && det.SnapshotSuffix() != "" {
-		snapVer := version.NextSnapshot(newVer, version.NormalizeSnapshotSuffix(det.SnapshotSuffix()))
-		if err := det.WriteVersion(detectDir, detector.Version{Raw: snapVer.String()}); err != nil {
+	if nextVer != "" {
+		if err := det.WriteVersion(detectDir, detector.Version{Raw: nextVer}); err != nil {
 			return nil, fmt.Errorf("writing snapshot version: %w", err)
 		}
 		if err := git.CreateCommit(dir, snapMsg, versionFiles(dir, detectDir, det)...); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
-		report("✓ Bumped to next development version: %s", snapVer.String())
+		report("✓ Bumped to next development version: %s", nextVer)
 		if err := git.Push(dir); err != nil {
 			return nil, fmt.Errorf("pushing snapshot commit: %w", err)
 		}
@@ -300,7 +315,51 @@ func resolveConvention(cfg *config.Config) commits.Convention {
 	return commits.ResolveConvention(conv, major, minor, patch)
 }
 
-func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.Semver, parsed []commits.ParsedCommit, tagPrefix string) *Result {
+func resolveReleaseVersion(base version.Semver, explicit string) (version.Semver, error) {
+	v, err := version.Parse(explicit)
+	if err != nil {
+		return version.Semver{}, fmt.Errorf("invalid release version: %w", err)
+	}
+	if v.IsPreRelease() {
+		return version.Semver{}, fmt.Errorf("release version must not be a pre-release: %s", explicit)
+	}
+	if v.Compare(base) <= 0 {
+		return version.Semver{}, fmt.Errorf("release version %s must be greater than current version %s", v.String(), base.CoreString())
+	}
+	return v, nil
+}
+
+func resolveNextVersion(release version.Semver, explicit string, snapshots bool, suffix string) (string, error) {
+	if explicit == "" {
+		if !snapshots || suffix == "" {
+			return "", nil
+		}
+		return formatSnapshotVersion(version.NextSnapshot(release, version.NormalizeSnapshotSuffix(suffix)), suffix), nil
+	}
+	if !snapshots || suffix == "" {
+		return "", fmt.Errorf("--next-version requires snapshot versioning for this project")
+	}
+	v, err := version.Parse(explicit)
+	if err != nil {
+		return "", fmt.Errorf("invalid next development version: %w", err)
+	}
+	if v.PreRelease != version.NormalizeSnapshotSuffix(suffix) {
+		return "", fmt.Errorf("next development version must use the %q snapshot suffix", suffix)
+	}
+	if v.Compare(release) <= 0 {
+		return "", fmt.Errorf("next development version %s must be greater than release version %s", v.String(), release.String())
+	}
+	return formatSnapshotVersion(v, suffix), nil
+}
+
+func formatSnapshotVersion(v version.Semver, suffix string) string {
+	if len(suffix) > 0 && suffix[0] == '.' {
+		return v.CoreString() + suffix
+	}
+	return v.String()
+}
+
+func dryRunReport(cfg *config.Config, prev, next version.Semver, nextSnapshot string, parsed []commits.ParsedCommit, tagPrefix string) *Result {
 	report("[dry-run] Would bump: %s → %s", prev.CoreString(), next.String())
 	if len(cfg.Propagate) > 0 {
 		report("[dry-run] Would propagate to %d files", len(cfg.Propagate))
@@ -313,9 +372,8 @@ func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.
 	if cfg.Publish.GitHub.Enabled == nil || *cfg.Publish.GitHub.Enabled {
 		report("[dry-run] Would publish GitHub Release")
 	}
-	if cfg.Version.Snapshot && det.SnapshotSuffix() != "" {
-		snapVer := version.NextSnapshot(next, version.NormalizeSnapshotSuffix(det.SnapshotSuffix()))
-		report("[dry-run] Would bump to %s after release", snapVer.String())
+	if nextSnapshot != "" {
+		report("[dry-run] Would bump to %s after release", nextSnapshot)
 	}
 	return &Result{
 		PrevVersion: prev.CoreString(),

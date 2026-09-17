@@ -54,6 +54,16 @@ Run the release:
 release-cli release
 ```
 
+For a controlled single-project release, provide exact versions instead of
+deriving a bump:
+
+```bash
+release-cli release --release-version 1.4.0 --next-version 1.5.0-SNAPSHOT
+```
+
+`--release-version` cannot be combined with `--bump`. `--next-version` requires
+snapshot versioning and the project's snapshot suffix.
+
 ## Commands
 
 ### `release-cli init`
@@ -75,6 +85,8 @@ Executes the full release pipeline: bump version, generate changelog, commit, ta
 | Flag        | Description                                  |
 | ----------- | -------------------------------------------- |
 | `--bump`    | Override bump level (major, minor, or patch) |
+| `--release-version` | Release an exact version (single project only) |
+| `--next-version` | Set the next snapshot version; requires `--release-version` |
 | `--package` | Release specific package(s) in monorepo mode |
 | `--all`     | Release all packages (monorepo mode)         |
 

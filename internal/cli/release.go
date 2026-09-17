@@ -12,9 +12,11 @@ import (
 )
 
 var (
-	bumpFlag     string
-	packageFlags []string
-	allFlag      bool
+	bumpFlag           string
+	releaseVersionFlag string
+	nextVersionFlag    string
+	packageFlags       []string
+	allFlag            bool
 )
 
 var releaseCmd = &cobra.Command{
@@ -28,12 +30,18 @@ and notify.`,
 
 func init() {
 	releaseCmd.Flags().StringVar(&bumpFlag, "bump", "", "Override version bump level (major, minor, patch)")
+	releaseCmd.Flags().StringVar(&releaseVersionFlag, "release-version", "", "Release this exact version")
+	releaseCmd.Flags().StringVar(&nextVersionFlag, "next-version", "", "Use this exact next development version (snapshot releases only)")
 	releaseCmd.Flags().StringArrayVar(&packageFlags, "package", nil, "Release specific package(s) in monorepo mode")
 	releaseCmd.Flags().BoolVar(&allFlag, "all", false, "Release all packages (monorepo mode)")
 	rootCmd.AddCommand(releaseCmd)
 }
 
 func runRelease(cmd *cobra.Command, args []string) error {
+	if err := validateVersionFlags(releaseVersionFlag, nextVersionFlag, bumpFlag); err != nil {
+		return err
+	}
+
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
@@ -57,6 +65,9 @@ func runRelease(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.IsMonorepo() {
+		if releaseVersionFlag != "" || nextVersionFlag != "" {
+			return fmt.Errorf("--release-version and --next-version are only supported for single-project releases")
+		}
 		return runMonorepoRelease(dir, cfg, bumpOverride)
 	}
 
@@ -68,10 +79,12 @@ func runRelease(cmd *cobra.Command, args []string) error {
 	}
 
 	result, err := pipeline.Run(pipeline.Options{
-		Dir:          dir,
-		Config:       cfg,
-		DryRun:       dryRun,
-		BumpOverride: bumpOverride,
+		Dir:            dir,
+		Config:         cfg,
+		DryRun:         dryRun,
+		BumpOverride:   bumpOverride,
+		ReleaseVersion: releaseVersionFlag,
+		NextVersion:    nextVersionFlag,
 	})
 	if err != nil {
 		return err
@@ -81,6 +94,16 @@ func runRelease(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\n✓ Released %s (tag: %s)\n", result.NewVersion, result.TagName)
+	return nil
+}
+
+func validateVersionFlags(releaseVersion, nextVersion, bump string) error {
+	if releaseVersion != "" && bump != "" {
+		return fmt.Errorf("--release-version cannot be used with --bump")
+	}
+	if nextVersion != "" && releaseVersion == "" {
+		return fmt.Errorf("--next-version requires --release-version")
+	}
 	return nil
 }
 
