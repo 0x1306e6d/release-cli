@@ -132,6 +132,43 @@ func TestPipeline_VersionOnlyCommit(t *testing.T) {
 	}
 }
 
+func TestPipeline_IncludesConfiguredReleaseFile(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
+
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add new feature")
+
+	cfg := &config.Config{
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Commit:    config.CommitConfig{Include: []string{"release-metadata.json"}},
+		Hooks:     config.HooksConfig{PostBump: "echo release > release-metadata.json"},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	if _, err := Run(Options{Dir: dir, Config: cfg}); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+
+	cmd := exec.Command("git", "show", "--format=", "--name-only", "HEAD")
+	cmd.Dir = dir
+	files, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Fields(string(files)); strings.Join(got, ",") != "package.json,release-metadata.json" {
+		t.Errorf("release commit files = %q, want package.json and release-metadata.json", files)
+	}
+}
+
 func TestPipeline_NoReleasableChanges(t *testing.T) {
 	dir := initTestRepo(t)
 

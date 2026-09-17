@@ -68,6 +68,7 @@ changelog:
   enabled: false
   file: HISTORY.md
 commit:
+  include: [release-metadata.json]
   release: "release {{ .ReleaseVersion }}"
   next: "next {{ .NextVersion }}"
 propagate:
@@ -109,6 +110,9 @@ publish:
 	}
 	if cfg.Commit.Release != "release {{ .ReleaseVersion }}" || cfg.Commit.Next != "next {{ .NextVersion }}" {
 		t.Errorf("commit templates = %#v, want configured values", cfg.Commit)
+	}
+	if len(cfg.Commit.Include) != 1 || cfg.Commit.Include[0] != "release-metadata.json" {
+		t.Errorf("commit.include = %q, want release-metadata.json", cfg.Commit.Include)
 	}
 	if len(cfg.Propagate) != 1 {
 		t.Fatalf("propagate count = %d, want 1", len(cfg.Propagate))

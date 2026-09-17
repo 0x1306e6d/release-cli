@@ -44,6 +44,11 @@ func (c *Config) validate() error {
 	if !isValidEnum(c.Commit.Mode, validCommitModes) {
 		errs = append(errs, fmt.Sprintf("invalid commit mode %q (valid: %s)", c.Commit.Mode, strings.Join(validCommitModes, ", ")))
 	}
+	for i, file := range c.Commit.Include {
+		if file == "" {
+			errs = append(errs, fmt.Sprintf("commit.include[%d]: file is required", i))
+		}
+	}
 
 	for i, p := range c.Propagate {
 		if p.File == "" {

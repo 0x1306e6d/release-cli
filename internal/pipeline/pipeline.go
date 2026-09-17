@@ -330,6 +330,9 @@ func includesReleaseArtifacts(cfg *config.Config) bool {
 
 func releaseFiles(dir, detectDir string, det detector.Detector, cfg *config.Config) []string {
 	files := versionFiles(dir, detectDir, det)
+	for _, file := range cfg.Commit.Include {
+		files = append(files, releasePath(dir, detectDir, file))
+	}
 	for _, target := range cfg.Propagate {
 		files = append(files, releasePath(dir, detectDir, target.File))
 	}
