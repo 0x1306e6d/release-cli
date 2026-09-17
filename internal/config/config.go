@@ -17,9 +17,10 @@ type Config struct {
 
 // CommitConfig controls release commit contents and messages.
 type CommitConfig struct {
-	Mode    string `yaml:"mode"`
-	Release string `yaml:"release"`
-	Next    string `yaml:"next"`
+	Mode    string   `yaml:"mode"`
+	Include []string `yaml:"include"`
+	Release string   `yaml:"release"`
+	Next    string   `yaml:"next"`
 }
 
 // IsMonorepo returns true when the config declares child modules.
