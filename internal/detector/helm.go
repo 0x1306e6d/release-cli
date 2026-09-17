@@ -11,7 +11,7 @@ import (
 type HelmDetector struct{}
 
 func (d *HelmDetector) Name() string      { return "helm" }
-func (d *HelmDetector) Aliases() []string  { return nil }
+func (d *HelmDetector) Aliases() []string { return nil }
 
 func (d *HelmDetector) Detect(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, "Chart.yaml"))
@@ -41,6 +41,8 @@ func (d *HelmDetector) WriteVersion(dir string, v Version) error {
 	updated := chartVersionRe.ReplaceAll(data, []byte(fmt.Sprintf("version: %s", v.Raw)))
 	return os.WriteFile(path, updated, 0644)
 }
+
+func (d *HelmDetector) VersionFiles() []string { return []string{"Chart.yaml"} }
 
 func (d *HelmDetector) DefaultPublishTargets() []string {
 	return []string{"github"}

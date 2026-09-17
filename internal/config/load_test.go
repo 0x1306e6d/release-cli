@@ -34,8 +34,24 @@ func TestLoad_MinimalConfig(t *testing.T) {
 	if cfg.Changelog.File != "CHANGELOG.md" {
 		t.Errorf("changelog.file = %q, want %q", cfg.Changelog.File, "CHANGELOG.md")
 	}
+	if cfg.Commit.Mode != "full" {
+		t.Errorf("commit.mode = %q, want %q", cfg.Commit.Mode, "full")
+	}
 	if cfg.Publish.GitHub.Enabled == nil || !*cfg.Publish.GitHub.Enabled {
 		t.Error("publish.github.enabled should default to true")
+	}
+}
+
+func TestLoad_VersionOnlyCommit(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, "project: go\ncommit:\n  mode: version-only\n")
+
+	cfg, _, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Commit.Mode != "version-only" {
+		t.Errorf("commit.mode = %q, want version-only", cfg.Commit.Mode)
 	}
 }
 

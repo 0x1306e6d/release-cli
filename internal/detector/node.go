@@ -11,7 +11,7 @@ import (
 type NodeDetector struct{}
 
 func (d *NodeDetector) Name() string      { return "node" }
-func (d *NodeDetector) Aliases() []string  { return nil }
+func (d *NodeDetector) Aliases() []string { return nil }
 
 func (d *NodeDetector) Detect(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, "package.json"))
@@ -62,6 +62,8 @@ func (d *NodeDetector) WriteVersion(dir string, v Version) error {
 
 	return os.WriteFile(path, out, 0644)
 }
+
+func (d *NodeDetector) VersionFiles() []string { return []string{"package.json"} }
 
 func (d *NodeDetector) DefaultPublishTargets() []string {
 	return []string{"github", "npm"}

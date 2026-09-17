@@ -23,6 +23,9 @@ type Detector interface {
 	// Detectors for tag-based ecosystems (e.g., Go) may be a no-op.
 	WriteVersion(dir string, v Version) error
 
+	// VersionFiles returns manifest paths changed by WriteVersion, relative to dir.
+	VersionFiles() []string
+
 	// DefaultPublishTargets returns the default publish target names for this ecosystem.
 	DefaultPublishTargets() []string
 

@@ -91,6 +91,47 @@ func TestPipeline_FullRelease_Node(t *testing.T) {
 	}
 }
 
+func TestPipeline_VersionOnlyCommit(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "version.txt"), []byte("VERSION=1.0.0\n"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
+
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add new feature")
+
+	cfg := &config.Config{
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(true), File: "CHANGELOG.md"},
+		Commit:    config.CommitConfig{Mode: "version-only"},
+		Propagate: []config.PropagateTarget{{File: "version.txt", Pattern: "VERSION={{.Version}}"}},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	if _, err := Run(Options{Dir: dir, Config: cfg}); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "CHANGELOG.md")); !os.IsNotExist(err) {
+		t.Fatalf("version-only release wrote changelog: %v", err)
+	}
+
+	cmd := exec.Command("git", "show", "--format=", "--name-only", "HEAD")
+	cmd.Dir = dir
+	files, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Fields(string(files)); strings.Join(got, ",") != "package.json,version.txt" {
+		t.Errorf("release commit files = %q, want package.json and version.txt", files)
+	}
+}
+
 func TestPipeline_NoReleasableChanges(t *testing.T) {
 	dir := initTestRepo(t)
 

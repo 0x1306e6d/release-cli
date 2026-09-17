@@ -11,7 +11,7 @@ import (
 type JavaMavenDetector struct{}
 
 func (d *JavaMavenDetector) Name() string      { return "java-maven" }
-func (d *JavaMavenDetector) Aliases() []string  { return []string{"java"} }
+func (d *JavaMavenDetector) Aliases() []string { return []string{"java"} }
 
 func (d *JavaMavenDetector) Detect(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, "pom.xml"))
@@ -51,6 +51,8 @@ func (d *JavaMavenDetector) WriteVersion(dir string, v Version) error {
 	updated = append(updated, data[loc[1]:]...)
 	return os.WriteFile(path, updated, 0644)
 }
+
+func (d *JavaMavenDetector) VersionFiles() []string { return []string{"pom.xml"} }
 
 func (d *JavaMavenDetector) DefaultPublishTargets() []string {
 	return []string{"github"}

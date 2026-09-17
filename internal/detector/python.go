@@ -11,7 +11,7 @@ import (
 type PythonDetector struct{}
 
 func (d *PythonDetector) Name() string      { return "python" }
-func (d *PythonDetector) Aliases() []string  { return nil }
+func (d *PythonDetector) Aliases() []string { return nil }
 
 func (d *PythonDetector) Detect(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, "pyproject.toml"))
@@ -41,6 +41,8 @@ func (d *PythonDetector) WriteVersion(dir string, v Version) error {
 	updated := pyVersionRe.ReplaceAll(data, []byte(fmt.Sprintf(`version = "%s"`, v.Raw)))
 	return os.WriteFile(path, updated, 0644)
 }
+
+func (d *PythonDetector) VersionFiles() []string { return []string{"pyproject.toml"} }
 
 func (d *PythonDetector) DefaultPublishTargets() []string {
 	return []string{"github", "pypi"}

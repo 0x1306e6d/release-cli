@@ -134,7 +134,7 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		}
 
 		var releaseBody string
-		if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
+		if includesReleaseArtifacts(cfg) && cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
 			refs := resolveReferences(dir, parsed)
 			entry := changelog.Generate(newVer.String(), parsed, refs)
 			entry.Grouped = cfg.Changes.IsGroupedChangelog()
@@ -207,7 +207,11 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 			return nil, err
 		}
 	}
-	if err := git.CreateCommit(dir, commitMsg, "."); err != nil {
+	var files []string
+	for _, r := range results {
+		files = append(files, releaseFiles(dir, r.DetectDir, r.Detector, r.Config)...)
+	}
+	if err := git.CreateCommit(dir, commitMsg, uniqueFiles(files)...); err != nil {
 		return nil, fmt.Errorf("creating batched release commit: %w", err)
 	}
 	report("✓ Created release commit: %s", commitMsg)
@@ -259,14 +263,16 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 
 	// Phase 4: Batched SNAPSHOT post-release.
 	if len(snapResults) > 0 {
+		var files []string
 		for _, r := range snapResults {
 			snapVer := version.NextSnapshot(r.NewVersion, version.NormalizeSnapshotSuffix(r.Detector.SnapshotSuffix()))
 			if err := r.Detector.WriteVersion(r.DetectDir, detector.Version{Raw: snapVer.String()}); err != nil {
 				return nil, fmt.Errorf("package %q: writing snapshot version: %w", r.Package.Name, err)
 			}
+			files = append(files, versionFiles(dir, r.DetectDir, r.Detector)...)
 			report("[%s] ✓ Bumped to next development version: %s", r.Package.Name, snapVer.String())
 		}
-		if err := git.CreateCommit(dir, snapMsg, "."); err != nil {
+		if err := git.CreateCommit(dir, snapMsg, uniqueFiles(files)...); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
 		if err := git.Push(dir); err != nil {
