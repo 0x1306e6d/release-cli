@@ -8,6 +8,7 @@ import (
 var (
 	validSchemes     = []string{"semver"}
 	validConventions = []string{"conventional", "angular", "custom"}
+	validCommitModes = []string{"full", "version-only"}
 )
 
 // validate checks the config for errors.
@@ -38,6 +39,10 @@ func (c *Config) validate() error {
 				errs = append(errs, "custom commit convention requires at least one type mapping in changes.commits.types")
 			}
 		}
+	}
+
+	if !isValidEnum(c.Commit.Mode, validCommitModes) {
+		errs = append(errs, fmt.Sprintf("invalid commit mode %q (valid: %s)", c.Commit.Mode, strings.Join(validCommitModes, ", ")))
 	}
 
 	for i, p := range c.Propagate {

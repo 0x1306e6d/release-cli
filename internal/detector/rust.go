@@ -11,7 +11,7 @@ import (
 type RustDetector struct{}
 
 func (d *RustDetector) Name() string      { return "rust" }
-func (d *RustDetector) Aliases() []string  { return nil }
+func (d *RustDetector) Aliases() []string { return nil }
 
 func (d *RustDetector) Detect(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, "Cargo.toml"))
@@ -41,6 +41,8 @@ func (d *RustDetector) WriteVersion(dir string, v Version) error {
 	updated := cargoVersionRe.ReplaceAll(data, []byte(fmt.Sprintf(`version = "%s"`, v.Raw)))
 	return os.WriteFile(path, updated, 0644)
 }
+
+func (d *RustDetector) VersionFiles() []string { return []string{"Cargo.toml"} }
 
 func (d *RustDetector) DefaultPublishTargets() []string {
 	return []string{"github", "crates.io"}

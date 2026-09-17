@@ -64,8 +64,11 @@ func LogBetween(dir string, fromRef, toRef string, pathFilter ...string) ([]Comm
 
 // CreateCommit stages the given files and creates a commit.
 func CreateCommit(dir string, message string, files ...string) error {
+	if err := ensureOnlyChangedFiles(dir, files); err != nil {
+		return err
+	}
 	if len(files) > 0 {
-		args := append([]string{"add"}, files...)
+		args := append([]string{"add", "--"}, files...)
 		if _, err := run(dir, args...); err != nil {
 			return fmt.Errorf("staging files: %w", err)
 		}
@@ -73,6 +76,26 @@ func CreateCommit(dir string, message string, files ...string) error {
 	_, err := run(dir, "commit", "-m", message)
 	if err != nil {
 		return fmt.Errorf("creating commit: %w", err)
+	}
+	return nil
+}
+
+func ensureOnlyChangedFiles(dir string, allowed []string) error {
+	allowedSet := make(map[string]bool, len(allowed))
+	for _, file := range allowed {
+		allowedSet[file] = true
+	}
+
+	for _, args := range [][]string{{"diff", "--name-only"}, {"diff", "--cached", "--name-only"}, {"ls-files", "--others", "--exclude-standard"}} {
+		out, err := run(dir, args...)
+		if err != nil {
+			return fmt.Errorf("checking release files: %w", err)
+		}
+		for _, file := range strings.Split(out, "\n") {
+			if file != "" && !allowedSet[file] {
+				return fmt.Errorf("unexpected release file %q", file)
+			}
+		}
 	}
 	return nil
 }

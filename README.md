@@ -141,6 +141,7 @@ changelog:
     {{ range .Groups }}...
 
 commit:
+  mode: full # full (default) or version-only
   release: "Release {{ .ReleaseVersion }}" # Optional Go template
   next: "Prepare next development iteration" # Optional Go template
 
@@ -167,6 +168,8 @@ publish:
 ```
 
 Environment variables can be referenced with `${VAR_NAME}` syntax in string values.
+
+Set `commit.mode: version-only` to commit only the version manifest and `propagate` targets; changelog generation is skipped.
 
 Commit message templates receive `.ReleaseVersion`, `.NextVersion`, `.Project`, and `.Package`.
 Omit either message to retain the default release-cli wording.

@@ -12,13 +12,14 @@ type stubDetector struct {
 	detectFunc func(string) bool
 }
 
-func (s *stubDetector) Name() string                          { return s.name }
-func (s *stubDetector) Aliases() []string                     { return s.aliases }
-func (s *stubDetector) Detect(dir string) bool                { return s.detectFunc(dir) }
-func (s *stubDetector) ReadVersion(dir string) (Version, error) { return Version{}, nil }
+func (s *stubDetector) Name() string                             { return s.name }
+func (s *stubDetector) Aliases() []string                        { return s.aliases }
+func (s *stubDetector) Detect(dir string) bool                   { return s.detectFunc(dir) }
+func (s *stubDetector) ReadVersion(dir string) (Version, error)  { return Version{}, nil }
 func (s *stubDetector) WriteVersion(dir string, v Version) error { return nil }
-func (s *stubDetector) DefaultPublishTargets() []string       { return nil }
-func (s *stubDetector) SnapshotSuffix() string                { return "" }
+func (s *stubDetector) VersionFiles() []string                   { return nil }
+func (s *stubDetector) DefaultPublishTargets() []string          { return nil }
+func (s *stubDetector) SnapshotSuffix() string                   { return "" }
 
 func TestRegistry_ExactNameLookup(t *testing.T) {
 	d := &stubDetector{name: "java-gradle", aliases: []string{"java"}}

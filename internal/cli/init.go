@@ -103,6 +103,7 @@ func generateConfig(project string, snapshot bool) string {
 	b.WriteString("#   file: CHANGELOG.md\n")
 
 	b.WriteString("\n# commit:\n")
+	b.WriteString("#   mode: full # full, version-only\n")
 	b.WriteString("#   release: \"Release {{ .ReleaseVersion }}\"\n")
 	b.WriteString("#   next: \"Prepare next development iteration\"\n")
 

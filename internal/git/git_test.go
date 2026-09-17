@@ -3,6 +3,7 @@ package git
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/0x1306e6d/release-cli/internal/version"
@@ -217,5 +218,16 @@ func TestCreateCommit(t *testing.T) {
 	}
 	if out == "" {
 		t.Error("expected commit log output")
+	}
+}
+
+func TestCreateCommit_RejectsUnexpectedFiles(t *testing.T) {
+	dir := initTestRepo(t)
+	_ = os.WriteFile(filepath.Join(dir, "version.txt"), []byte("1.0.1"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "build.out"), []byte("artifact"), 0644)
+
+	err := CreateCommit(dir, "Release 1.0.1", "version.txt")
+	if err == nil || !strings.Contains(err.Error(), "build.out") {
+		t.Fatalf("expected unexpected file error, got %v", err)
 	}
 }

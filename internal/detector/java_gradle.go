@@ -11,7 +11,7 @@ import (
 type JavaGradleDetector struct{}
 
 func (d *JavaGradleDetector) Name() string      { return "java-gradle" }
-func (d *JavaGradleDetector) Aliases() []string  { return []string{"java"} }
+func (d *JavaGradleDetector) Aliases() []string { return []string{"java"} }
 
 func (d *JavaGradleDetector) Detect(dir string) bool {
 	for _, f := range []string{"build.gradle", "build.gradle.kts"} {
@@ -45,6 +45,8 @@ func (d *JavaGradleDetector) WriteVersion(dir string, v Version) error {
 	updated := gradleVersionRe.ReplaceAll(data, []byte(fmt.Sprintf("version=%s", v.Raw)))
 	return os.WriteFile(path, updated, 0644)
 }
+
+func (d *JavaGradleDetector) VersionFiles() []string { return []string{"gradle.properties"} }
 
 func (d *JavaGradleDetector) DefaultPublishTargets() []string {
 	return []string{"github"}

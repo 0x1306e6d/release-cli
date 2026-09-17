@@ -11,7 +11,7 @@ import (
 type DartDetector struct{}
 
 func (d *DartDetector) Name() string      { return "dart" }
-func (d *DartDetector) Aliases() []string  { return nil }
+func (d *DartDetector) Aliases() []string { return nil }
 
 func (d *DartDetector) Detect(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, "pubspec.yaml"))
@@ -41,6 +41,8 @@ func (d *DartDetector) WriteVersion(dir string, v Version) error {
 	updated := pubspecVersionRe.ReplaceAll(data, []byte(fmt.Sprintf("version: %s", v.Raw)))
 	return os.WriteFile(path, updated, 0644)
 }
+
+func (d *DartDetector) VersionFiles() []string { return []string{"pubspec.yaml"} }
 
 func (d *DartDetector) DefaultPublishTargets() []string {
 	return []string{"github"}

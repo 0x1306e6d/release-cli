@@ -15,8 +15,9 @@ type Config struct {
 	Notify    NotifyConfig      `yaml:"notify"`
 }
 
-// CommitConfig configures messages used for release commits.
+// CommitConfig controls release commit contents and messages.
 type CommitConfig struct {
+	Mode    string `yaml:"mode"`
 	Release string `yaml:"release"`
 	Next    string `yaml:"next"`
 }
@@ -144,6 +145,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Changelog.File == "" {
 		c.Changelog.File = "CHANGELOG.md"
+	}
+	if c.Commit.Mode == "" {
+		c.Commit.Mode = "full"
 	}
 	if c.Publish.GitHub.Enabled == nil {
 		c.Publish.GitHub.Enabled = boolPtr(true)

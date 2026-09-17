@@ -6,7 +6,7 @@ import "os"
 type GoDetector struct{}
 
 func (d *GoDetector) Name() string      { return "go" }
-func (d *GoDetector) Aliases() []string  { return nil }
+func (d *GoDetector) Aliases() []string { return nil }
 
 func (d *GoDetector) Detect(dir string) bool {
 	_, err := os.Stat(dir + "/go.mod")
@@ -22,6 +22,8 @@ func (d *GoDetector) WriteVersion(dir string, v Version) error {
 	// No manifest to write for Go projects.
 	return nil
 }
+
+func (d *GoDetector) VersionFiles() []string { return nil }
 
 func (d *GoDetector) DefaultPublishTargets() []string {
 	return []string{"github"}

@@ -183,7 +183,7 @@ func Run(opts Options) (*Result, error) {
 	// 9. Changelog.
 	var changelogContent string
 	var releaseBody string
-	if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
+	if includesReleaseArtifacts(cfg) && cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
 		refs := resolveReferences(dir, parsed)
 		entry := changelog.Generate(newVer.String(), parsed, refs)
 		entry.Grouped = cfg.Changes.IsGroupedChangelog()
@@ -204,7 +204,7 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 10. Commit.
-	if err := git.CreateCommit(dir, commitMsg, "."); err != nil {
+	if err := git.CreateCommit(dir, commitMsg, releaseFiles(dir, detectDir, det, cfg)...); err != nil {
 		return nil, fmt.Errorf("creating release commit: %w", err)
 	}
 	report("✓ Created release commit")
@@ -246,7 +246,7 @@ func Run(opts Options) (*Result, error) {
 		if err := det.WriteVersion(detectDir, detector.Version{Raw: snapVer.String()}); err != nil {
 			return nil, fmt.Errorf("writing snapshot version: %w", err)
 		}
-		if err := git.CreateCommit(dir, snapMsg, "."); err != nil {
+		if err := git.CreateCommit(dir, snapMsg, versionFiles(dir, detectDir, det)...); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
 		report("✓ Bumped to next development version: %s", snapVer.String())
@@ -305,7 +305,7 @@ func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.
 	if len(cfg.Propagate) > 0 {
 		report("[dry-run] Would propagate to %d files", len(cfg.Propagate))
 	}
-	if cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
+	if includesReleaseArtifacts(cfg) && cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
 		report("[dry-run] Would update %s", cfg.Changelog.File)
 	}
 	tag := git.NamespacedTagString(tagPrefix, next)
@@ -322,6 +322,49 @@ func dryRunReport(cfg *config.Config, det detector.Detector, prev, next version.
 		NewVersion:  next.String(),
 		TagName:     tag,
 	}
+}
+
+func includesReleaseArtifacts(cfg *config.Config) bool {
+	return cfg.Commit.Mode != "version-only"
+}
+
+func releaseFiles(dir, detectDir string, det detector.Detector, cfg *config.Config) []string {
+	files := versionFiles(dir, detectDir, det)
+	for _, target := range cfg.Propagate {
+		files = append(files, releasePath(dir, detectDir, target.File))
+	}
+	if includesReleaseArtifacts(cfg) && cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
+		files = append(files, releasePath(dir, detectDir, cfg.Changelog.File))
+	}
+	return uniqueFiles(files)
+}
+
+func versionFiles(dir, detectDir string, det detector.Detector) []string {
+	files := make([]string, 0, len(det.VersionFiles()))
+	for _, file := range det.VersionFiles() {
+		files = append(files, releasePath(dir, detectDir, file))
+	}
+	return files
+}
+
+func releasePath(dir, detectDir, file string) string {
+	prefix, err := filepath.Rel(dir, detectDir)
+	if err != nil || prefix == "." {
+		return filepath.Clean(file)
+	}
+	return filepath.Join(prefix, file)
+}
+
+func uniqueFiles(files []string) []string {
+	seen := make(map[string]bool, len(files))
+	out := make([]string, 0, len(files))
+	for _, file := range files {
+		if file != "" && !seen[file] {
+			seen[file] = true
+			out = append(out, file)
+		}
+	}
+	return out
 }
 
 func runGitHubPublish(dir string, cfg *config.Config, tag, ver, changelogBody string) error {
