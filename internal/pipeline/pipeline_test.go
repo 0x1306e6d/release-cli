@@ -372,6 +372,93 @@ func TestPipeline_BumpOverride(t *testing.T) {
 	}
 }
 
+func TestPipeline_ExplicitReleaseVersion(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test","version":"1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
+
+	cfg := &config.Config{
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	result, err := Run(Options{Dir: dir, Config: cfg, ReleaseVersion: "2.0.0"})
+	if err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+	if result == nil || result.NewVersion != "2.0.0" || result.TagName != "v2.0.0" {
+		t.Fatalf("result = %#v, want version 2.0.0 and tag v2.0.0", result)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "package.json"))
+	if !strings.Contains(string(data), `"2.0.0"`) {
+		t.Errorf("package.json = %s, want 2.0.0", data)
+	}
+}
+
+func TestPipeline_InvalidExplicitVersionDoesNotWriteFiles(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test","version":"1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
+
+	cfg := &config.Config{Project: "node", Version: config.VersionConfig{Scheme: "semver"}}
+	if _, err := Run(Options{Dir: dir, Config: cfg, ReleaseVersion: "1.0.0"}); err == nil {
+		t.Fatal("expected non-incrementing release version error")
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "package.json"))
+	if !strings.Contains(string(data), `"1.0.0"`) {
+		t.Errorf("package.json was modified: %s", data)
+	}
+}
+
+func TestPipeline_ExplicitNextSnapshotVersion(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "build.gradle"), []byte("plugins { id 'java' }\n"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "gradle.properties"), []byte("version=1.0.0-SNAPSHOT\n"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v0.9.0", "-m", "v0.9.0")
+
+	cfg := &config.Config{
+		Project:   "java-gradle",
+		Version:   config.VersionConfig{Scheme: "semver", Snapshot: true},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	if _, err := Run(Options{Dir: dir, Config: cfg, ReleaseVersion: "1.0.0", NextVersion: "1.1.0-SNAPSHOT"}); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "gradle.properties"))
+	if got := string(data); got != "version=1.1.0-SNAPSHOT\n" {
+		t.Errorf("gradle.properties = %q, want next snapshot version", got)
+	}
+}
+
+func TestResolveNextVersion(t *testing.T) {
+	release := version.Semver{Major: 1, Minor: 0, Patch: 0}
+	if _, err := resolveNextVersion(release, "1.0.0-SNAPSHOT", true, "SNAPSHOT"); err == nil {
+		t.Fatal("expected non-incrementing snapshot error")
+	}
+	if _, err := resolveNextVersion(release, "1.1.0-dev", true, "SNAPSHOT"); err == nil {
+		t.Fatal("expected invalid snapshot suffix error")
+	}
+}
+
+func TestPipeline_RejectsOrphanNextVersion(t *testing.T) {
+	if _, err := Run(Options{NextVersion: "1.1.0-SNAPSHOT"}); err == nil {
+		t.Fatal("expected next version without release version error")
+	}
+}
+
 func TestPipeline_NoCategorize_FlatChangelog(t *testing.T) {
 	dir := initTestRepo(t)
 

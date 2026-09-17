@@ -48,4 +48,4 @@ func (d *PythonDetector) DefaultPublishTargets() []string {
 	return []string{"github", "pypi"}
 }
 
-func (d *PythonDetector) SnapshotSuffix() string { return "dev0" }
+func (d *PythonDetector) SnapshotSuffix() string { return ".dev0" }

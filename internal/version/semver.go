@@ -94,6 +94,9 @@ func Parse(s string) (Semver, error) {
 	if err != nil {
 		return Semver{}, fmt.Errorf("invalid patch version %q", segments[2])
 	}
+	if major < 0 || minor < 0 || patch < 0 {
+		return Semver{}, fmt.Errorf("invalid semver %q: version components must be non-negative", s)
+	}
 
 	return Semver{
 		Major:      major,
@@ -130,6 +133,27 @@ func (v Semver) IsZero() bool {
 // IsPreRelease returns true if the version has a pre-release suffix.
 func (v Semver) IsPreRelease() bool {
 	return v.PreRelease != ""
+}
+
+// Compare compares semantic-version core components.
+func (v Semver) Compare(other Semver) int {
+	if v.Major != other.Major {
+		return sign(v.Major - other.Major)
+	}
+	if v.Minor != other.Minor {
+		return sign(v.Minor - other.Minor)
+	}
+	return sign(v.Patch - other.Patch)
+}
+
+func sign(n int) int {
+	if n < 0 {
+		return -1
+	}
+	if n > 0 {
+		return 1
+	}
+	return 0
 }
 
 // Bump returns a new version incremented by the given bump type.
