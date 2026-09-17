@@ -783,6 +783,87 @@ func TestPipeline_InvalidCommitMessageTemplateDoesNotCommit(t *testing.T) {
 	}
 }
 
+func TestPipeline_RollsBackAfterPushFailure(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test","version":"1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add feature")
+
+	head := strings.TrimSpace(gitOutput(t, dir, "rev-parse", "HEAD"))
+	mustGit(t, dir, "remote", "set-url", "origin", filepath.Join(dir, "missing-remote"))
+	cfg := &config.Config{
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	if _, err := Run(Options{Dir: dir, Config: cfg}); err == nil {
+		t.Fatal("expected push failure")
+	}
+	if got := strings.TrimSpace(gitOutput(t, dir, "rev-parse", "HEAD")); got != head {
+		t.Errorf("HEAD = %s, want %s", got, head)
+	}
+	tag := exec.Command("git", "rev-parse", "--verify", "v1.1.0")
+	tag.Dir = dir
+	if _, err := tag.Output(); err == nil {
+		t.Fatal("release tag was not removed")
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	if err != nil || string(data) != `{"name":"test","version":"1.0.0"}` {
+		t.Errorf("package.json after rollback = %q, %v", data, err)
+	}
+}
+
+func TestPipeline_RollbackPreservesUnexpectedHookFiles(t *testing.T) {
+	dir := initTestRepo(t)
+
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test","version":"1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add feature")
+
+	cfg := &config.Config{
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Hooks:     config.HooksConfig{PostBump: "echo hook > hook-output.txt"},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	if _, err := Run(Options{Dir: dir, Config: cfg}); err == nil {
+		t.Fatal("expected unexpected release file error")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "hook-output.txt")); err != nil {
+		t.Fatalf("hook output was not preserved: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	if err != nil || string(data) != `{"name":"test","version":"1.0.0"}` {
+		t.Errorf("package.json after rollback = %q, %v", data, err)
+	}
+}
+
+func gitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return string(out)
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }

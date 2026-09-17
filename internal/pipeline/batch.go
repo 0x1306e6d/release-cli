@@ -3,6 +3,7 @@ package pipeline
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/0x1306e6d/release-cli/internal/changelog"
 	"github.com/0x1306e6d/release-cli/internal/commits"
@@ -29,13 +30,44 @@ type PackageResult struct {
 // BatchRelease coordinates a batched release of multiple packages.
 // Each package runs detect/analyze/bump/propagate/changelog independently,
 // then one commit and multiple tags are created.
-func BatchRelease(dir string, packages []*PackageContext, configs []*config.Config, dryRun bool, bumpOverride *version.BumpType) ([]*Result, error) {
+func BatchRelease(dir string, packages []*PackageContext, configs []*config.Config, dryRun bool, bumpOverride *version.BumpType) (out []*Result, err error) {
 	if len(packages) != len(configs) {
 		return nil, fmt.Errorf("packages and configs must have the same length")
 	}
 
 	var results []*PackageResult
 	registry := detector.DefaultRegistry()
+	var rollback *git.Rollback
+	if !dryRun {
+		var files []string
+		for i, pkg := range packages {
+			detectDir := dir
+			if pkg.Path != "" {
+				detectDir = filepath.Join(dir, pkg.Path)
+			}
+			det, err := registry.Resolve(configs[i].Project, detectDir)
+			if err != nil {
+				return nil, fmt.Errorf("package %q: %w", pkg.Name, err)
+			}
+			files = append(files, releaseFiles(dir, detectDir, det, configs[i])...)
+		}
+		rollback, err = git.NewRollback(dir, uniqueFiles(files)...)
+		if err != nil {
+			return nil, fmt.Errorf("snapshotting local release state: %w", err)
+		}
+		defer func() {
+			if err == nil {
+				return
+			}
+			unexpected, rollbackErr := rollback.Rollback()
+			if len(unexpected) > 0 {
+				report("⚠ Preserved unrelated changes: %s", strings.Join(unexpected, ", "))
+			}
+			if rollbackErr != nil {
+				err = fmt.Errorf("%w; rolling back local release changes: %v", err, rollbackErr)
+			}
+		}()
+	}
 
 	// Phase 1: Per-package detect/analyze/bump/propagate/changelog.
 	for i, pkg := range packages {
@@ -214,6 +246,9 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 	if err := git.CreateCommit(dir, commitMsg, uniqueFiles(files)...); err != nil {
 		return nil, fmt.Errorf("creating batched release commit: %w", err)
 	}
+	if err := rollback.RecordCommit(); err != nil {
+		return nil, fmt.Errorf("recording release commit: %w", err)
+	}
 	report("✓ Created release commit: %s", commitMsg)
 
 	// Phase 2b: Create tags.
@@ -221,6 +256,7 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		if err := git.CreateTag(dir, r.TagName, fmt.Sprintf("Release %s %s", r.Package.Name, r.NewVersion.String())); err != nil {
 			return nil, fmt.Errorf("creating tag %s: %w", r.TagName, err)
 		}
+		rollback.RecordTag(r.TagName)
 		report("✓ Tagged %s", r.TagName)
 	}
 
@@ -232,6 +268,7 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 	if err := git.Push(dir, tagNames...); err != nil {
 		return nil, fmt.Errorf("pushing batched release: %w", err)
 	}
+	rollback.MarkPushed()
 	report("✓ Pushed commit and tags to remote")
 
 	// Phase 3: Per-package publish and notify.
