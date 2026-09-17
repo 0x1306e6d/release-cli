@@ -152,6 +152,32 @@ func TestNamespacedTagString(t *testing.T) {
 	}
 }
 
+func TestLatestSemverTagWithFormat(t *testing.T) {
+	dir := initTestRepo(t)
+	mustRun(t, dir, "tag", "-a", "release-1.2.0", "-m", "release")
+	mustRun(t, dir, "tag", "-a", "release-1.3.0", "-m", "release")
+	v, err := LatestSemverTagWithFormat(dir, "", "release-{{ .Version }}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "1.3.0" {
+		t.Errorf("got %q, want 1.3.0", v.String())
+	}
+}
+
+func TestPushWithOptionsUsesConfiguredRemote(t *testing.T) {
+	dir := initTestRepo(t)
+	bare := t.TempDir()
+	mustRun(t, bare, "init", "--bare")
+	mustRun(t, dir, "remote", "add", "release", bare)
+	if err := PushWithOptions(dir, "release", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(bare, "show-ref", "--verify", "refs/heads/main"); err != nil {
+		t.Fatalf("configured remote did not receive branch: %v", err)
+	}
+}
+
 func TestLogBetween_WithPathFilter(t *testing.T) {
 	dir := initTestRepo(t)
 	mustRun(t, dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0")

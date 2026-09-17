@@ -91,6 +91,35 @@ func TestPipeline_FullRelease_Node(t *testing.T) {
 	}
 }
 
+func TestPipeline_CustomGitPolicy(t *testing.T) {
+	dir := initTestRepo(t)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name": "test", "version": "1.0.0"}`), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "initial commit")
+	mustGit(t, dir, "tag", "-a", "release-1.0.0", "-m", "release")
+	_ = os.WriteFile(filepath.Join(dir, "feature.js"), []byte("// new feature"), 0644)
+	mustGit(t, dir, "add", ".")
+	mustGit(t, dir, "commit", "-m", "feat: add new feature")
+
+	push := false
+	cfg := &config.Config{
+		Project:   "node",
+		Version:   config.VersionConfig{Scheme: "semver"},
+		Changes:   config.ChangesConfig{Commits: &config.CommitsConfig{Convention: "conventional"}},
+		Changelog: config.ChangelogConfig{Enabled: boolPtr(false)},
+		Git:       config.GitConfig{Branch: "^main$", TagFormat: "release-{{ .Version }}", Push: &push, CommitArgs: []string{"--no-verify"}},
+		Publish:   config.PublishConfig{GitHub: config.GitHubPublishConfig{Enabled: boolPtr(false)}},
+	}
+
+	result, err := Run(Options{Dir: dir, Config: cfg})
+	if err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+	if result.TagName != "release-1.1.0" {
+		t.Errorf("tag = %q, want release-1.1.0", result.TagName)
+	}
+}
+
 func TestPipeline_VersionOnlyCommit(t *testing.T) {
 	dir := initTestRepo(t)
 

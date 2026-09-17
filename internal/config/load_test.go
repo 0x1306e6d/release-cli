@@ -37,6 +37,9 @@ func TestLoad_MinimalConfig(t *testing.T) {
 	if cfg.Commit.Mode != "full" {
 		t.Errorf("commit.mode = %q, want %q", cfg.Commit.Mode, "full")
 	}
+	if cfg.Git.RemoteName() != "origin" || cfg.Git.ReleaseTagFormat() != "v{{ .Version }}" || !cfg.Git.PushEnabled() {
+		t.Errorf("git defaults = %#v", cfg.Git)
+	}
 	if cfg.Publish.GitHub.Enabled == nil || !*cfg.Publish.GitHub.Enabled {
 		t.Error("publish.github.enabled should default to true")
 	}
@@ -71,6 +74,14 @@ commit:
   include: [release-metadata.json]
   release: "release {{ .ReleaseVersion }}"
   next: "next {{ .NextVersion }}"
+git:
+  remote: release
+  branch: "^main$"
+  tag-format: "release-{{ .Version }}"
+  sign-tag: true
+  push: false
+  commit-args: [--no-verify]
+  push-args: [--follow-tags]
 propagate:
   - file: Dockerfile
     type: docker-label
@@ -113,6 +124,9 @@ publish:
 	}
 	if len(cfg.Commit.Include) != 1 || cfg.Commit.Include[0] != "release-metadata.json" {
 		t.Errorf("commit.include = %q, want release-metadata.json", cfg.Commit.Include)
+	}
+	if cfg.Git.RemoteName() != "release" || cfg.Git.Branch != "^main$" || cfg.Git.ReleaseTagFormat() != "release-{{ .Version }}" || !cfg.Git.SignTag || cfg.Git.PushEnabled() || len(cfg.Git.CommitArgs) != 1 || len(cfg.Git.PushArgs) != 1 {
+		t.Errorf("git config = %#v", cfg.Git)
 	}
 	if len(cfg.Propagate) != 1 {
 		t.Fatalf("propagate count = %d, want 1", len(cfg.Propagate))
@@ -204,6 +218,21 @@ func TestLoad_InvalidConvention(t *testing.T) {
 	_, _, err := Load(dir)
 	if err == nil {
 		t.Fatal("expected validation error for invalid convention")
+	}
+}
+
+func TestLoad_InvalidGitPolicy(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `project: go
+git:
+  branch: "["
+  tag-format: "release"
+  commit-args: [no-verify]
+`)
+
+	_, _, err := Load(dir)
+	if err == nil {
+		t.Fatal("expected validation error for invalid git policy")
 	}
 }
 

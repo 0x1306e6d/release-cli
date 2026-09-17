@@ -9,10 +9,43 @@ type Config struct {
 	Changes   ChangesConfig     `yaml:"changes"`
 	Changelog ChangelogConfig   `yaml:"changelog"`
 	Commit    CommitConfig      `yaml:"commit"`
+	Git       GitConfig         `yaml:"git"`
 	Propagate []PropagateTarget `yaml:"propagate"`
 	Hooks     HooksConfig       `yaml:"hooks"`
 	Publish   PublishConfig     `yaml:"publish"`
 	Notify    NotifyConfig      `yaml:"notify"`
+}
+
+// GitConfig controls the Git operations performed for a release.
+type GitConfig struct {
+	Remote     string   `yaml:"remote"`
+	Branch     string   `yaml:"branch"`
+	TagFormat  string   `yaml:"tag-format"`
+	SignTag    bool     `yaml:"sign-tag"`
+	Push       *bool    `yaml:"push"`
+	CommitArgs []string `yaml:"commit-args"`
+	PushArgs   []string `yaml:"push-args"`
+}
+
+// RemoteName returns the configured remote or the legacy origin default.
+func (g GitConfig) RemoteName() string {
+	if g.Remote == "" {
+		return "origin"
+	}
+	return g.Remote
+}
+
+// ReleaseTagFormat returns the configured tag template or the legacy v prefix.
+func (g GitConfig) ReleaseTagFormat() string {
+	if g.TagFormat == "" {
+		return "v{{ .Version }}"
+	}
+	return g.TagFormat
+}
+
+// PushEnabled reports whether release commits and tags should be pushed.
+func (g GitConfig) PushEnabled() bool {
+	return g.Push == nil || *g.Push
 }
 
 // CommitConfig controls release commit contents and messages.
@@ -149,6 +182,15 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Commit.Mode == "" {
 		c.Commit.Mode = "full"
+	}
+	if c.Git.Remote == "" {
+		c.Git.Remote = "origin"
+	}
+	if c.Git.TagFormat == "" {
+		c.Git.TagFormat = "v{{ .Version }}"
+	}
+	if c.Git.Push == nil {
+		c.Git.Push = boolPtr(true)
 	}
 	if c.Publish.GitHub.Enabled == nil {
 		c.Publish.GitHub.Enabled = boolPtr(true)
