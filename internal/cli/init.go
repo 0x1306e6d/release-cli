@@ -102,6 +102,10 @@ func generateConfig(project string, snapshot bool) string {
 	b.WriteString("#   enabled: true\n")
 	b.WriteString("#   file: CHANGELOG.md\n")
 
+	b.WriteString("\n# commit:\n")
+	b.WriteString("#   release: \"Release {{ .ReleaseVersion }}\"\n")
+	b.WriteString("#   next: \"Prepare next development iteration\"\n")
+
 	b.WriteString("\n# propagate:\n")
 	b.WriteString("#   - file: Dockerfile\n")
 	b.WriteString("#     type: docker-label\n")

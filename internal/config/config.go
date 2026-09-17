@@ -8,10 +8,17 @@ type Config struct {
 	Version   VersionConfig     `yaml:"version"`
 	Changes   ChangesConfig     `yaml:"changes"`
 	Changelog ChangelogConfig   `yaml:"changelog"`
+	Commit    CommitConfig      `yaml:"commit"`
 	Propagate []PropagateTarget `yaml:"propagate"`
 	Hooks     HooksConfig       `yaml:"hooks"`
 	Publish   PublishConfig     `yaml:"publish"`
 	Notify    NotifyConfig      `yaml:"notify"`
+}
+
+// CommitConfig configures messages used for release commits.
+type CommitConfig struct {
+	Release string `yaml:"release"`
+	Next    string `yaml:"next"`
 }
 
 // IsMonorepo returns true when the config declares child modules.
@@ -41,7 +48,7 @@ type ChangesConfig struct {
 
 // CommitsConfig configures commit-based change detection.
 type CommitsConfig struct {
-	Convention string           `yaml:"convention"`
+	Convention string            `yaml:"convention"`
 	Types      CommitTypesConfig `yaml:"types"`
 }
 
