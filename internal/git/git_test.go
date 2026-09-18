@@ -12,7 +12,7 @@ import (
 func initTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	mustRun(t, dir, "init")
+	mustRun(t, dir, "init", "-b", "main")
 	mustRun(t, dir, "config", "user.email", "test@test.com")
 	mustRun(t, dir, "config", "user.name", "Test")
 	// Create initial commit.

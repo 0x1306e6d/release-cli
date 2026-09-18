@@ -14,7 +14,7 @@ import (
 func initTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	mustGit(t, dir, "init")
+	mustGit(t, dir, "init", "-b", "main")
 	mustGit(t, dir, "config", "user.email", "test@test.com")
 	mustGit(t, dir, "config", "user.name", "Test")
 
