@@ -108,6 +108,15 @@ func generateConfig(project string, snapshot bool) string {
 	b.WriteString("#   release: \"Release {{ .ReleaseVersion }}\"\n")
 	b.WriteString("#   next: \"Prepare next development iteration\"\n")
 
+	b.WriteString("\n# git:\n")
+	b.WriteString("#   remote: origin\n")
+	b.WriteString("#   branch: \"^main$\" # Optional regular expression\n")
+	b.WriteString("#   tag-format: \"v{{ .Version }}\"\n")
+	b.WriteString("#   sign-tag: false\n")
+	b.WriteString("#   push: true\n")
+	b.WriteString("#   commit-args: [--no-verify]\n")
+	b.WriteString("#   push-args: [--follow-tags]\n")
+
 	b.WriteString("\n# propagate:\n")
 	b.WriteString("#   - file: Dockerfile\n")
 	b.WriteString("#     type: docker-label\n")

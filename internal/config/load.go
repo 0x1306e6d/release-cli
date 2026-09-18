@@ -21,6 +21,7 @@ var knownTopLevelKeys = map[string]bool{
 	"changes":   true,
 	"changelog": true,
 	"commit":    true,
+	"git":       true,
 	"propagate": true,
 	"hooks":     true,
 	"publish":   true,

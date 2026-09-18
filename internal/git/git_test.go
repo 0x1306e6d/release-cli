@@ -12,7 +12,7 @@ import (
 func initTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	mustRun(t, dir, "init")
+	mustRun(t, dir, "init", "-b", "main")
 	mustRun(t, dir, "config", "user.email", "test@test.com")
 	mustRun(t, dir, "config", "user.name", "Test")
 	// Create initial commit.
@@ -149,6 +149,32 @@ func TestNamespacedTagString(t *testing.T) {
 	}
 	if got := NamespacedTagString("workflow/sub", v); got != "workflow/sub/v1.2.3" {
 		t.Errorf("nested prefix: got %q, want %q", got, "workflow/sub/v1.2.3")
+	}
+}
+
+func TestLatestSemverTagWithFormat(t *testing.T) {
+	dir := initTestRepo(t)
+	mustRun(t, dir, "tag", "-a", "release-1.2.0", "-m", "release")
+	mustRun(t, dir, "tag", "-a", "release-1.3.0", "-m", "release")
+	v, err := LatestSemverTagWithFormat(dir, "", "release-{{ .Version }}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "1.3.0" {
+		t.Errorf("got %q, want 1.3.0", v.String())
+	}
+}
+
+func TestPushWithOptionsUsesConfiguredRemote(t *testing.T) {
+	dir := initTestRepo(t)
+	bare := t.TempDir()
+	mustRun(t, bare, "init", "--bare")
+	mustRun(t, dir, "remote", "add", "release", bare)
+	if err := PushWithOptions(dir, "release", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(bare, "show-ref", "--verify", "refs/heads/main"); err != nil {
+		t.Fatalf("configured remote did not receive branch: %v", err)
 	}
 }
 
