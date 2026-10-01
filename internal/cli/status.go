@@ -63,7 +63,7 @@ func showSingleProjectStatus(dir string, cfg *config.Config) error {
 	}
 
 	// Get last release tag.
-	lastTag, _ := git.LatestSemverTag(dir)
+	lastTag, _ := git.LatestSemverTagWithFormat(dir, "", cfg.Git.ReleaseTagFormat())
 
 	// Read current version.
 	var currentVer version.Semver
@@ -77,7 +77,7 @@ func showSingleProjectStatus(dir string, cfg *config.Config) error {
 	// Count commits since last release.
 	fromTag := ""
 	if !lastTag.IsZero() {
-		fromTag = lastTag.StripPreRelease().TagString()
+		fromTag = git.TagString("", lastTag.StripPreRelease(), cfg.Git.ReleaseTagFormat())
 	}
 	gitCommits, _ := git.LogBetween(dir, fromTag, "HEAD")
 
@@ -91,7 +91,7 @@ func showSingleProjectStatus(dir string, cfg *config.Config) error {
 
 	fmt.Printf("Project:     %s (%s)\n", cfg.Project, det.Name())
 	fmt.Printf("Current:     %s\n", currentVer.String())
-	fmt.Printf("Last release: %s\n", lastTag.TagString())
+	fmt.Printf("Last release: %s\n", git.TagString("", lastTag, cfg.Git.ReleaseTagFormat()))
 	fmt.Printf("Commits since: %d\n", len(gitCommits))
 
 	if bumpType != nil {
@@ -156,12 +156,12 @@ func runMonorepoStatus(dir string) error {
 		if verErr == nil && v.Raw != "" {
 			currentVer, _ = version.Parse(v.Raw)
 		} else {
-			currentVer, _ = git.LatestSemverTag(dir, node.TagPrefix())
+			currentVer, _ = git.LatestSemverTagWithFormat(dir, node.TagPrefix(), node.Config.Git.ReleaseTagFormat())
 		}
 
 		fromTag := ""
 		if !currentVer.IsZero() {
-			fromTag = git.NamespacedTagString(node.TagPrefix(), currentVer.StripPreRelease())
+			fromTag = git.TagString(node.TagPrefix(), currentVer.StripPreRelease(), node.Config.Git.ReleaseTagFormat())
 		}
 
 		gitCommits, _ := git.LogBetween(dir, fromTag, "HEAD", node.Path)
@@ -196,12 +196,12 @@ func showPackageStatus(dir, detectDir string, node *monorepo.PackageNode) error 
 	if verErr == nil && v.Raw != "" {
 		currentVer, _ = version.Parse(v.Raw)
 	} else {
-		currentVer, _ = git.LatestSemverTag(dir, node.TagPrefix())
+		currentVer, _ = git.LatestSemverTagWithFormat(dir, node.TagPrefix(), node.Config.Git.ReleaseTagFormat())
 	}
 
 	fromTag := ""
 	if currentVer.Major != 0 || currentVer.Minor != 0 || currentVer.Patch != 0 {
-		fromTag = git.NamespacedTagString(node.TagPrefix(), currentVer.StripPreRelease())
+		fromTag = git.TagString(node.TagPrefix(), currentVer.StripPreRelease(), node.Config.Git.ReleaseTagFormat())
 	}
 
 	gitCommits, _ := git.LogBetween(dir, fromTag, "HEAD", node.Path)
@@ -217,7 +217,7 @@ func showPackageStatus(dir, detectDir string, node *monorepo.PackageNode) error 
 	fmt.Printf("Project:     %s (%s)\n", node.Config.Project, det.Name())
 	fmt.Printf("Path:        %s\n", node.Path)
 	fmt.Printf("Current:     %s\n", currentVer.String())
-	lastTag := git.NamespacedTagString(node.TagPrefix(), currentVer.StripPreRelease())
+	lastTag := git.TagString(node.TagPrefix(), currentVer.StripPreRelease(), node.Config.Git.ReleaseTagFormat())
 	fmt.Printf("Last release: %s\n", lastTag)
 	fmt.Printf("Commits since: %d\n", len(gitCommits))
 

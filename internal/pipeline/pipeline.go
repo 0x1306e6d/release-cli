@@ -55,6 +55,10 @@ func Run(opts Options) (*Result, error) {
 	cfg := opts.Config
 	dir := opts.Dir
 	pkg := opts.Package
+	if err := git.ValidateReleaseBranch(dir, cfg.Git.Branch); err != nil {
+		return nil, err
+	}
+	tagFormat := cfg.Git.ReleaseTagFormat()
 
 	// Resolve scoped paths for monorepo.
 	detectDir := dir
@@ -77,14 +81,14 @@ func Run(opts Options) (*Result, error) {
 	report("Detected project type: %s", det.Name())
 
 	// 2. Read current version.
-	prevVer, err := readCurrentVersion(dir, det, detectDir, tagPrefix)
+	prevVer, err := readCurrentVersion(dir, det, detectDir, tagPrefix, tagFormat)
 	if err != nil {
 		return nil, fmt.Errorf("reading current version: %w", err)
 	}
 	report("Current version: %s", prevVer.String())
 
 	// 3. Analyze commits.
-	baseVer, fromTag, err := resolveReleaseBase(dir, prevVer, tagPrefix)
+	baseVer, fromTag, err := resolveReleaseBase(dir, prevVer, tagPrefix, tagFormat)
 	if err != nil {
 		return nil, fmt.Errorf("resolving release base: %w", err)
 	}
@@ -130,6 +134,10 @@ func Run(opts Options) (*Result, error) {
 		newVer = baseVer.Bump(*bumpType)
 	}
 	report("Version bump: %s → %s", baseVer.CoreString(), newVer.String())
+	tag := git.TagString(tagPrefix, newVer, tagFormat)
+	if err := git.ValidateTagName(dir, tag); err != nil {
+		return nil, err
+	}
 
 	nextVer, err := resolveNextVersion(newVer, opts.NextVersion, cfg.Version.Snapshot, det.SnapshotSuffix())
 	if err != nil {
@@ -220,23 +228,24 @@ func Run(opts Options) (*Result, error) {
 	}
 
 	// 10. Commit.
-	if err := git.CreateCommit(dir, commitMsg, releaseFiles(dir, detectDir, det, cfg)...); err != nil {
+	if err := git.CreateCommitWithOptions(dir, commitMsg, cfg.Git.CommitArgs, releaseFiles(dir, detectDir, det, cfg)...); err != nil {
 		return nil, fmt.Errorf("creating release commit: %w", err)
 	}
 	report("✓ Created release commit")
 
 	// 11. Tag.
-	tag := git.NamespacedTagString(tagPrefix, newVer)
-	if err := git.CreateTag(dir, tag, fmt.Sprintf("Release %s", releaseCommitLabel(packageName, newVer.String()))); err != nil {
+	if err := git.CreateTag(dir, tag, fmt.Sprintf("Release %s", releaseCommitLabel(packageName, newVer.String())), cfg.Git.SignTag); err != nil {
 		return nil, err
 	}
 	report("✓ Tagged %s", tag)
 
 	// 11b. Push commit and tag to remote.
-	if err := git.Push(dir, tag); err != nil {
-		return nil, fmt.Errorf("pushing release: %w", err)
+	if cfg.Git.PushEnabled() {
+		if err := git.PushWithOptions(dir, cfg.Git.RemoteName(), cfg.Git.PushArgs, tag); err != nil {
+			return nil, fmt.Errorf("pushing release: %w", err)
+		}
+		report("✓ Pushed commit and tag to remote")
 	}
-	report("✓ Pushed commit and tag to remote")
 
 	// 12. Pre-publish hook.
 	if err := RunHook(dir, cfg.Hooks.PrePublish, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts...); err != nil {
@@ -261,14 +270,16 @@ func Run(opts Options) (*Result, error) {
 		if err := det.WriteVersion(detectDir, detector.Version{Raw: nextVer}); err != nil {
 			return nil, fmt.Errorf("writing snapshot version: %w", err)
 		}
-		if err := git.CreateCommit(dir, snapMsg, versionFiles(dir, detectDir, det)...); err != nil {
+		if err := git.CreateCommitWithOptions(dir, snapMsg, cfg.Git.CommitArgs, versionFiles(dir, detectDir, det)...); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
 		report("✓ Bumped to next development version: %s", nextVer)
-		if err := git.Push(dir); err != nil {
-			return nil, fmt.Errorf("pushing snapshot commit: %w", err)
+		if cfg.Git.PushEnabled() {
+			if err := git.PushWithOptions(dir, cfg.Git.RemoteName(), cfg.Git.PushArgs); err != nil {
+				return nil, fmt.Errorf("pushing snapshot commit: %w", err)
+			}
+			report("✓ Pushed snapshot commit to remote")
 		}
-		report("✓ Pushed snapshot commit to remote")
 	}
 
 	return &Result{
@@ -278,26 +289,26 @@ func Run(opts Options) (*Result, error) {
 	}, nil
 }
 
-func resolveReleaseBase(dir string, manifestVer version.Semver, tagPrefix string) (version.Semver, string, error) {
+func resolveReleaseBase(dir string, manifestVer version.Semver, tagPrefix, tagFormat string) (version.Semver, string, error) {
 	if manifestVer.IsPreRelease() {
-		baseVer, err := git.LatestSemverTag(dir, tagPrefix)
+		baseVer, err := git.LatestSemverTagWithFormat(dir, tagPrefix, tagFormat)
 		if err != nil {
 			return version.Semver{}, "", err
 		}
 		if baseVer.IsZero() {
 			return baseVer, "", nil
 		}
-		return baseVer, git.NamespacedTagString(tagPrefix, baseVer), nil
+		return baseVer, git.TagString(tagPrefix, baseVer, tagFormat), nil
 	}
 
 	baseVer := manifestVer.StripPreRelease()
 	if baseVer.IsZero() {
 		return baseVer, "", nil
 	}
-	return baseVer, git.NamespacedTagString(tagPrefix, baseVer), nil
+	return baseVer, git.TagString(tagPrefix, baseVer, tagFormat), nil
 }
 
-func readCurrentVersion(dir string, det detector.Detector, detectDir, tagPrefix string) (version.Semver, error) {
+func readCurrentVersion(dir string, det detector.Detector, detectDir, tagPrefix, tagFormat string) (version.Semver, error) {
 	// For Go (or any tag-based detector with no manifest), read from git tags.
 	v, err := det.ReadVersion(detectDir)
 	if err != nil {
@@ -305,7 +316,7 @@ func readCurrentVersion(dir string, det detector.Detector, detectDir, tagPrefix 
 	}
 	if v.Raw == "" {
 		// Tag-based ecosystem: read from git tags (with optional prefix).
-		return git.LatestSemverTag(dir, tagPrefix)
+		return git.LatestSemverTagWithFormat(dir, tagPrefix, tagFormat)
 	}
 	return version.Parse(v.Raw)
 }
@@ -367,7 +378,7 @@ func dryRunReport(cfg *config.Config, prev, next version.Semver, nextSnapshot st
 	if includesReleaseArtifacts(cfg) && cfg.Changelog.Enabled != nil && *cfg.Changelog.Enabled {
 		report("[dry-run] Would update %s", cfg.Changelog.File)
 	}
-	tag := git.NamespacedTagString(tagPrefix, next)
+	tag := git.TagString(tagPrefix, next, cfg.Git.ReleaseTagFormat())
 	report("[dry-run] Would create tag %s", tag)
 	if cfg.Publish.GitHub.Enabled == nil || *cfg.Publish.GitHub.Enabled {
 		report("[dry-run] Would publish GitHub Release")

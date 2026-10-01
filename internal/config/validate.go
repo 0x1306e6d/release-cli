@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -44,6 +45,22 @@ func (c *Config) validate() error {
 	if !isValidEnum(c.Commit.Mode, validCommitModes) {
 		errs = append(errs, fmt.Sprintf("invalid commit mode %q (valid: %s)", c.Commit.Mode, strings.Join(validCommitModes, ", ")))
 	}
+
+	if c.Git.Branch != "" {
+		if _, err := regexp.Compile(c.Git.Branch); err != nil {
+			errs = append(errs, fmt.Sprintf("git.branch must be a valid regular expression: %v", err))
+		}
+	}
+	if strings.Count(c.Git.ReleaseTagFormat(), "{{ .Version }}") != 1 {
+		errs = append(errs, `git.tag-format must contain exactly one "{{ .Version }}" placeholder`)
+	} else if !validTagFormat(c.Git.ReleaseTagFormat()) {
+		errs = append(errs, "git.tag-format renders an invalid Git tag name")
+	}
+	for _, option := range append(c.Git.CommitArgs, c.Git.PushArgs...) {
+		if !strings.HasPrefix(option, "-") {
+			errs = append(errs, fmt.Sprintf("git options must start with '-': %q", option))
+		}
+	}
 	for i, file := range c.Commit.Include {
 		if file == "" {
 			errs = append(errs, fmt.Sprintf("commit.include[%d]: file is required", i))
@@ -71,6 +88,14 @@ func (c *Config) validate() error {
 		return fmt.Errorf("config validation failed:\n  - %s", strings.Join(errs, "\n  - "))
 	}
 	return nil
+}
+
+func validTagFormat(format string) bool {
+	tag := strings.Replace(format, "{{ .Version }}", "1.2.3", 1)
+	return tag != "" && !strings.HasPrefix(tag, ".") && !strings.HasSuffix(tag, ".") &&
+		!strings.HasPrefix(tag, "/") && !strings.HasSuffix(tag, "/") &&
+		!strings.Contains(tag, "..") && !strings.Contains(tag, "//") && !strings.Contains(tag, "@{") &&
+		!strings.ContainsAny(tag, " ~^:?*[\\")
 }
 
 func isValidEnum(value string, valid []string) bool {

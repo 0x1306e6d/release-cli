@@ -64,6 +64,11 @@ func LogBetween(dir string, fromRef, toRef string, pathFilter ...string) ([]Comm
 
 // CreateCommit stages the given files and creates a commit.
 func CreateCommit(dir string, message string, files ...string) error {
+	return CreateCommitWithOptions(dir, message, nil, files...)
+}
+
+// CreateCommitWithOptions stages files and creates a release commit with Git options.
+func CreateCommitWithOptions(dir string, message string, options []string, files ...string) error {
 	if err := ensureOnlyChangedFiles(dir, files); err != nil {
 		return err
 	}
@@ -73,7 +78,9 @@ func CreateCommit(dir string, message string, files ...string) error {
 			return fmt.Errorf("staging files: %w", err)
 		}
 	}
-	_, err := run(dir, "commit", "-m", message)
+	args := append([]string{"commit"}, options...)
+	args = append(args, "-m", message)
+	_, err := run(dir, args...)
 	if err != nil {
 		return fmt.Errorf("creating commit: %w", err)
 	}

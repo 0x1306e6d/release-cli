@@ -158,6 +158,15 @@ commit:
   release: "Release {{ .ReleaseVersion }}" # Optional Go template
   next: "Prepare next development iteration" # Optional Go template
 
+git:
+  remote: origin # Remote to push (default: origin)
+  branch: "^main$" # Optional regular expression for permitted release branches
+  tag-format: "v{{ .Version }}" # Must contain exactly one {{ .Version }} (default)
+  sign-tag: false # Create signed tags
+  push: true # Push release commits and tags (default: true)
+  commit-args: [--no-verify] # Optional arguments passed to git commit
+  push-args: [--follow-tags] # Optional arguments passed to git push
+
 propagate: # Propagate version to other files
   - file: Dockerfile
     type: docker-label # Built-in type

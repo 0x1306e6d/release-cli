@@ -33,6 +33,18 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 	if len(packages) != len(configs) {
 		return nil, fmt.Errorf("packages and configs must have the same length")
 	}
+	if len(configs) == 0 {
+		return nil, nil
+	}
+	policy := configs[0].Git
+	for _, cfg := range configs[1:] {
+		if !sameGitPolicy(policy, cfg.Git) {
+			return nil, fmt.Errorf("batched releases require identical git policies")
+		}
+	}
+	if err := git.ValidateReleaseBranch(dir, policy.Branch); err != nil {
+		return nil, err
+	}
 
 	var results []*PackageResult
 	registry := detector.DefaultRegistry()
@@ -40,6 +52,7 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 	// Phase 1: Per-package detect/analyze/bump/propagate/changelog.
 	for i, pkg := range packages {
 		cfg := configs[i]
+		tagFormat := cfg.Git.ReleaseTagFormat()
 
 		detectDir := dir
 		if pkg.Path != "" {
@@ -52,13 +65,13 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		}
 		report("[%s] Detected project type: %s", pkg.Name, det.Name())
 
-		prevVer, err := readCurrentVersion(dir, det, detectDir, pkg.TagPrefix)
+		prevVer, err := readCurrentVersion(dir, det, detectDir, pkg.TagPrefix, tagFormat)
 		if err != nil {
 			return nil, fmt.Errorf("package %q: reading current version: %w", pkg.Name, err)
 		}
 		report("[%s] Current version: %s", pkg.Name, prevVer.String())
 
-		baseVer, fromTag, err := resolveReleaseBase(dir, prevVer, pkg.TagPrefix)
+		baseVer, fromTag, err := resolveReleaseBase(dir, prevVer, pkg.TagPrefix, tagFormat)
 		if err != nil {
 			return nil, fmt.Errorf("package %q: resolving release base: %w", pkg.Name, err)
 		}
@@ -94,9 +107,12 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 		// Calculate new version.
 		newVer := baseVer.Bump(*bt)
 		report("[%s] Version bump: %s → %s", pkg.Name, baseVer.CoreString(), newVer.String())
+		tag := git.TagString(pkg.TagPrefix, newVer, tagFormat)
+		if err := git.ValidateTagName(dir, tag); err != nil {
+			return nil, err
+		}
 
 		if dryRun {
-			tag := git.NamespacedTagString(pkg.TagPrefix, newVer)
 			report("[%s] [dry-run] Would bump: %s → %s, tag: %s", pkg.Name, baseVer.CoreString(), newVer.String(), tag)
 			results = append(results, &PackageResult{
 				Package:     pkg,
@@ -155,7 +171,6 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 			report("[%s] ✓ Updated %s", pkg.Name, cfg.Changelog.File)
 		}
 
-		tag := git.NamespacedTagString(pkg.TagPrefix, newVer)
 		results = append(results, &PackageResult{
 			Package:     pkg,
 			Config:      cfg,
@@ -211,14 +226,14 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 	for _, r := range results {
 		files = append(files, releaseFiles(dir, r.DetectDir, r.Detector, r.Config)...)
 	}
-	if err := git.CreateCommit(dir, commitMsg, uniqueFiles(files)...); err != nil {
+	if err := git.CreateCommitWithOptions(dir, commitMsg, policy.CommitArgs, uniqueFiles(files)...); err != nil {
 		return nil, fmt.Errorf("creating batched release commit: %w", err)
 	}
 	report("✓ Created release commit: %s", commitMsg)
 
 	// Phase 2b: Create tags.
 	for _, r := range results {
-		if err := git.CreateTag(dir, r.TagName, fmt.Sprintf("Release %s %s", r.Package.Name, r.NewVersion.String())); err != nil {
+		if err := git.CreateTag(dir, r.TagName, fmt.Sprintf("Release %s %s", r.Package.Name, r.NewVersion.String()), policy.SignTag); err != nil {
 			return nil, fmt.Errorf("creating tag %s: %w", r.TagName, err)
 		}
 		report("✓ Tagged %s", r.TagName)
@@ -229,10 +244,12 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 	for _, r := range results {
 		tagNames = append(tagNames, r.TagName)
 	}
-	if err := git.Push(dir, tagNames...); err != nil {
-		return nil, fmt.Errorf("pushing batched release: %w", err)
+	if policy.PushEnabled() {
+		if err := git.PushWithOptions(dir, policy.RemoteName(), policy.PushArgs, tagNames...); err != nil {
+			return nil, fmt.Errorf("pushing batched release: %w", err)
+		}
+		report("✓ Pushed commit and tags to remote")
 	}
-	report("✓ Pushed commit and tags to remote")
 
 	// Phase 3: Per-package publish and notify.
 	var finalResults []*Result
@@ -272,14 +289,38 @@ func BatchRelease(dir string, packages []*PackageContext, configs []*config.Conf
 			files = append(files, versionFiles(dir, r.DetectDir, r.Detector)...)
 			report("[%s] ✓ Bumped to next development version: %s", r.Package.Name, snapVer.String())
 		}
-		if err := git.CreateCommit(dir, snapMsg, uniqueFiles(files)...); err != nil {
+		if err := git.CreateCommitWithOptions(dir, snapMsg, policy.CommitArgs, uniqueFiles(files)...); err != nil {
 			return nil, fmt.Errorf("creating snapshot commit: %w", err)
 		}
-		if err := git.Push(dir); err != nil {
-			return nil, fmt.Errorf("pushing snapshot commit: %w", err)
+		if policy.PushEnabled() {
+			if err := git.PushWithOptions(dir, policy.RemoteName(), policy.PushArgs); err != nil {
+				return nil, fmt.Errorf("pushing snapshot commit: %w", err)
+			}
+			report("✓ Pushed snapshot commit to remote")
 		}
-		report("✓ Pushed snapshot commit to remote")
 	}
 
 	return finalResults, nil
+}
+
+func sameGitPolicy(a, b config.GitConfig) bool {
+	return a.RemoteName() == b.RemoteName() &&
+		a.Branch == b.Branch &&
+		a.ReleaseTagFormat() == b.ReleaseTagFormat() &&
+		a.SignTag == b.SignTag &&
+		a.PushEnabled() == b.PushEnabled() &&
+		sameStrings(a.CommitArgs, b.CommitArgs) &&
+		sameStrings(a.PushArgs, b.PushArgs)
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
