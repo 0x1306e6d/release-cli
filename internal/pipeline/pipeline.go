@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/0x1306e6d/release-cli/internal/changelog"
 	"github.com/0x1306e6d/release-cli/internal/commits"
@@ -44,7 +45,7 @@ type Result struct {
 }
 
 // Run executes the full release pipeline.
-func Run(opts Options) (*Result, error) {
+func Run(opts Options) (result *Result, err error) {
 	if opts.ReleaseVersion != "" && opts.BumpOverride != nil {
 		return nil, fmt.Errorf("release version override cannot be used with bump override")
 	}
@@ -174,6 +175,23 @@ func Run(opts Options) (*Result, error) {
 		return dryRunReport(cfg, baseVer, newVer, nextVer, parsed, tagPrefix), nil
 	}
 
+	rollback, err := git.NewRollback(dir, releaseFiles(dir, detectDir, det, cfg)...)
+	if err != nil {
+		return nil, fmt.Errorf("snapshotting local release state: %w", err)
+	}
+	defer func() {
+		if err == nil {
+			return
+		}
+		unexpected, rollbackErr := rollback.Rollback()
+		if len(unexpected) > 0 {
+			report("⚠ Preserved unrelated changes: %s", strings.Join(unexpected, ", "))
+		}
+		if rollbackErr != nil {
+			err = fmt.Errorf("%w; rolling back local release changes: %v", err, rollbackErr)
+		}
+	}()
+
 	// Build hook options for monorepo package context.
 	var hookOpts []HookOptions
 	if pkg != nil {
@@ -231,12 +249,16 @@ func Run(opts Options) (*Result, error) {
 	if err := git.CreateCommitWithOptions(dir, commitMsg, cfg.Git.CommitArgs, releaseFiles(dir, detectDir, det, cfg)...); err != nil {
 		return nil, fmt.Errorf("creating release commit: %w", err)
 	}
+	if err := rollback.RecordCommit(); err != nil {
+		return nil, fmt.Errorf("recording release commit: %w", err)
+	}
 	report("✓ Created release commit")
 
 	// 11. Tag.
 	if err := git.CreateTag(dir, tag, fmt.Sprintf("Release %s", releaseCommitLabel(packageName, newVer.String())), cfg.Git.SignTag); err != nil {
 		return nil, err
 	}
+	rollback.RecordTag(tag)
 	report("✓ Tagged %s", tag)
 
 	// 11b. Push commit and tag to remote.
@@ -246,6 +268,7 @@ func Run(opts Options) (*Result, error) {
 		}
 		report("✓ Pushed commit and tag to remote")
 	}
+	rollback.MarkPushed()
 
 	// 12. Pre-publish hook.
 	if err := RunHook(dir, cfg.Hooks.PrePublish, newVer.String(), baseVer.CoreString(), cfg.Project, hookOpts...); err != nil {
